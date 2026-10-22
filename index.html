@@ -92,6 +92,8 @@ textarea{min-height:110px;font-size:12px}
 .pos{color:#10b981}
 nav button{font-size:11px;padding:7px 2px}
 .ic{padding:14px;margin-bottom:12px}
+.seg2{display:flex}
+.split2{flex-wrap:wrap;gap:6px}
 </style>
 </head>
 <body>
@@ -139,13 +141,13 @@ function vg(){
 var a=txM(Y,Mo),tot=sum(a),ef=sum(a.filter(function(t){return t.pay==="efectivo"}));
 var h=mh()+'<section class="hero"><span>Gastado en '+MN[Mo]+'</span><strong>'+M$(tot)+'</strong>';
 if(S.budget>0){var over=tot>S.budget;h+='<div class="pb'+(over?" over":"")+'"><i style="width:'+Math.min(100,tot*100/S.budget)+'%"></i></div><small>'+(over?"Te pasaste por "+M$(tot-S.budget):"Te quedan "+M$(S.budget-tot)+" de "+M$(S.budget))+"</small>"}
-h+='<div class="split"><span>💵 '+M$(ef)+"</span><span>💳 "+M$(tot-ef)+"</span></div></section>";h+=pend();
+h+='<div class="split"><span>💵 '+M$(ef)+"</span><span>🏦 "+M$(sum(a.filter(function(t){return t.pay==="cuenta"})))+"</span><span>💳 "+M$(sum(a.filter(function(t){return t.pay==="tarjeta"})))+"</span></div></section>";h+=pend();
 if(!a.length)return h+'<div class="empty">Aún no hay gastos en este mes.<br>Toca + para registrar el primero.</div>';
 a.sort(function(x,y){return x.date<y.date?1:x.date>y.date?-1:(x.id<y.id?1:-1)});
 var days={},order=[];a.forEach(function(t){if(!days[t.date]){days[t.date]=[];order.push(t.date)}days[t.date].push(t)});
 order.forEach(function(d){var l=days[d],lb=new Date(d+"T00:00:00").toLocaleDateString("es-CO",{weekday:"long",day:"numeric",month:"long"});
 h+='<div class="day"><span>'+lb+"</span><span>"+M$(sum(l))+'</span></div><div class="card">';
-l.forEach(function(t){var c=cat(t.cat),sub=t.pay==="efectivo"?"Efectivo":"Tarjeta"+(cardName(t.card)?" · "+e(cardName(t.card)):"");
+l.forEach(function(t){var c=cat(t.cat),sub=pyX(t);
 h+='<button class="row" onclick="edTx(\''+t.id+'\')"><span class="av" style="--c:'+c.color+'">'+c.emoji+'</span><span class="grow"><b>'+e(c.name)+"</b><small>"+sub+(t.note?" · "+e(t.note):"")+'</small></span><b class="amt">'+M$(t.amt)+"</b></button>"});
 h+="</div>"});
 return h}
@@ -157,8 +159,9 @@ h+='<section class="hero"><span>Total de '+MN[Mo]+"</span><strong>"+M$(tot)+"</s
 h+='<div class="kp"><div><b>'+M$(tot/nd)+"</b><small>por día</small></div><div><b>"+a.length+"</b><small>gastos</small></div><div><b>"+M$(mx)+"</b><small>el mayor</small></div></div>";var pm_=Y+"-"+pad(Mo+1),inc=sum(S.mv.filter(function(m){return m.type==="ingreso"&&m.date.indexOf(pm_)===0}));if(inc)h+='<div class="kp"><div><b class="pos">+'+M$(inc)+"</b><small>ingresos</small></div><div><b>"+M$(tot)+"</b><small>gastos</small></div><div><b class='"+(inc-tot<0?"neg":"pos")+"'>"+M$(inc-tot)+"</b><small>balance</small></div></div>";
 var cs=gsum(a,function(t){return t.cat||"-"}),ks=Object.keys(cs).sort(function(x,y){return cs[y]-cs[x]});
 h+="<h2>Por categoría</h2><div class='card'>"+ks.map(function(k){var c=cat(k),p=cs[k]*100/tot;return'<div class="st"><div class="sr"><span class="av sm" style="--c:'+c.color+'">'+c.emoji+'</span><span class="grow">'+e(c.name)+"</span><b>"+M$(cs[k])+'</b></div><div class="bar" style="--c:'+c.color+'"><i style="width:'+p+'%"></i></div><small>'+Math.round(p)+" % del total</small></div>"}).join("")+"</div>";
-var ef=sum(a.filter(function(t){return t.pay==="efectivo"})),ta=tot-ef;
-h+='<h2>Medio de pago</h2><div class="card"><div class="seg2"><i style="width:'+ef*100/tot+'%"></i></div><div class="split2"><span>💵 Efectivo <b>'+M$(ef)+"</b></span><span>💳 Tarjeta <b>"+M$(ta)+"</b></span></div>";
+var ef=sum(a.filter(function(t){return t.pay==="efectivo"})),cu=sum(a.filter(function(t){return t.pay==="cuenta"})),ta=tot-ef-cu;
+h+='<h2>Medio de pago</h2><div class="card"><div class="seg2"><i style="width:'+ef*100/tot+'%"></i><i style="width:'+cu*100/tot+'%;background:#0ea5e9"></i></div><div class="split2"><span>💵 Efectivo <b>'+M$(ef)+"</b></span><span>🏦 Cuentas <b>"+M$(cu)+"</b></span><span>💳 Tarjeta <b>"+M$(ta)+"</b></span></div>";
+var ca=gsum(a.filter(function(t){return t.pay==="cuenta"}),function(t){return t.acct||"-"});Object.keys(ca).sort(function(x,y){return ca[y]-ca[x]}).forEach(function(k){h+='<div class="row2"><span class="grow">🏦 '+e(acct(k))+"</span><b>"+M$(ca[k])+"</b></div>"});
 var cd=gsum(a.filter(function(t){return t.pay==="tarjeta"}),function(t){return t.card||"-"});
 Object.keys(cd).sort(function(x,y){return cd[y]-cd[x]}).forEach(function(k){h+='<div class="row2"><span class="grow">'+(k==="-"?"Tarjeta sin especificar":e(cardName(k)||"Tarjeta eliminada"))+"</span><b>"+M$(cd[k])+"</b></div>"});
 h+="</div>";
@@ -177,12 +180,15 @@ return h}
 function sbud(){S.budget=Number(digits($("bu").value))||0;save();$("mb").textContent=S.budget?"Presupuesto guardado.":"Presupuesto quitado."}
 function cp(id){var t=$(id);t.select();try{navigator.clipboard.writeText(t.value)}catch(x){try{document.execCommand("copy")}catch(y){}}$("mr").textContent="Copiado."}
 function im(){try{var d=JSON.parse($("bk").value);if(!d||!Array.isArray(d.tx)||!Array.isArray(d.cats))throw 0;S=norm(d);save();tab="g";go()}catch(x){$("mr").textContent="El texto no es un respaldo válido."}}
-function csv(){var q=function(s){return'"'+String(s||"").replace(/"/g,'""')+'"'},L=["fecha;monto;categoría;medio;tarjeta;nota"];
-S.tx.slice().sort(function(a,b){return a.date<b.date?-1:1}).forEach(function(t){L.push([t.date,t.amt,q(cat(t.cat).name),t.pay,q(cardName(t.card)),q(t.note)].join(";"))});
+function csv(){var q=function(s){return'"'+String(s||"").replace(/"/g,'""')+'"'},L=["fecha;monto;categoría;medio;tarjeta o cuenta;nota"];
+S.tx.slice().sort(function(a,b){return a.date<b.date?-1:1}).forEach(function(t){L.push([t.date,t.amt,q(cat(t.cat).name),t.pay,q(t.pay==="cuenta"?acct(t.acct):cardName(t.card)),q(t.note)].join(";"))});
 var t=$("bk");t.value=L.join("\n");cp("bk");$("mr").textContent="Tabla copiada: pégala en Excel o Google Sheets."}
-function edTx(id){var t=S.tx.find(function(x){return x.id===id});ed=t?{k:"tx",id:id,amt:dots(t.amt),cat:t.cat,pay:t.pay,card:t.card||"",date:t.date,note:t.note||""}:{k:"tx",amt:"",cat:S.cats[0]?S.cats[0].id:"",pay:"efectivo",card:"",date:today(),note:""};go()}
+function edTx(id){var t=S.tx.find(function(x){return x.id===id});ed=t?{k:"tx",id:id,amt:dots(t.amt),cat:t.cat,pay:t.pay,acct:t.acct||"",card:t.card||"",date:t.date,note:t.note||""}:{k:"tx",amt:"",cat:S.cats[0]?S.cats[0].id:"",pay:"efectivo",acct:"",card:"",date:today(),note:""};go()}
 function edCat(id){var c=S.cats.find(function(x){return x.id===id});ed=c?{k:"cat",id:id,name:c.name,emoji:c.emoji,color:c.color}:{k:"cat",name:"",emoji:"🏷️",color:PAL[S.cats.length%8]};go()}
 function keep(){if(["mv","acct","inv","invc","kard","rec"].indexOf(ed.k)>=0)return keep2();if(ed.k==="tx"){ed.amt=$("fa").value;ed.date=$("fd").value;ed.note=$("fo").value;if($("fc"))ed.card=$("fc").value}else if(ed.k==="cat"){ed.name=$("fn").value;ed.emoji=$("fe").value}else{ed.name=$("fn").value}}
+function pickAc(id){keep();ed.pay=id==="efectivo"?"efectivo":"cuenta";ed.acct=id==="efectivo"?"":id;render()}
+function pickRP(v){keep();if(v.indexOf("a:")===0){ed.pay="cuenta";ed.acct=v.slice(2)}else ed.pay=v;if(ed.pay==="tarjeta"&&!ed.card&&S.cards.length)ed.card=S.cards[0].id;render()}
+function pyX(t){return t.pay==="tarjeta"?"Tarjeta"+(cardName(t.card)?" · "+e(cardName(t.card)):""):t.pay==="cuenta"?e(acct(t.acct)):"Efectivo"}
 function pick(k,v){keep();ed[k]=v;if(k==="pay"&&v==="tarjeta"&&(ed.k==="tx"||ed.k==="rec")&&!ed.card&&S.cards.length)ed.card=S.cards[0].id;render()}
 function cancel(){ed=null;render()}
 function form(){
@@ -190,8 +196,8 @@ if(ed.k==="kard")return fKard();if(ed.k==="rec")return fRec();if(ed.k==="mv")ret
 if(ed.k==="tx"){
 var h="<h1>"+(ed.id?"Editar gasto":"Nuevo gasto")+"</h1><div class='card' style='padding:14px'><label style='margin:0;text-align:center'>Monto (COP)</label><input class='big' id='fa' inputmode='numeric' placeholder='$ 0' value='"+ed.amt+"' oninput='this.value=dots(this.value);dl()'></div>";
 h+="<label>Categoría</label><div class='chips'>"+S.cats.map(function(c){return'<button class="chip'+(c.id===ed.cat?" on":"")+'" style="--c:'+c.color+'" onclick="pick(\'cat\',\''+c.id+'\')"><span>'+c.emoji+"</span>"+e(c.name)+"</button>"}).join("")+"</div>";
-h+="<label>Medio de pago</label><div class='seg'><button class='chip"+(ed.pay==="efectivo"?" on":"")+"' onclick=\"pick('pay','efectivo')\"><span>💵</span>Efectivo</button><button class='chip"+(ed.pay==="tarjeta"?" on":"")+"' onclick=\"pick('pay','tarjeta')\"><span>💳</span>Tarjeta</button></div>";
-if(ed.pay==="efectivo")h+="<p class='msg'>Saldo en efectivo: <b>"+M$(bal("efectivo"))+"</b></p>";if(ed.pay==="tarjeta")h+=S.cards.length?"<label>¿Con cuál tarjeta?</label><select id='fc' onchange='dl()'><option value=''>Sin especificar</option>"+S.cards.map(function(c){return"<option value='"+c.id+"'"+(c.id===ed.card?" selected":"")+">"+e(c.name)+"</option>"}).join("")+"</select><p class='msg' id='dl'></p>":"<p class='msg'>Aún no tienes tarjetas. Agrégalas en Ajustes y vuelve a editar este gasto.</p>";
+h+="<label>Medio de pago</label><div class='chips'>"+S.accts.map(function(a){var on=a.id==="efectivo"?ed.pay==="efectivo":(ed.pay==="cuenta"&&ed.acct===a.id);return"<button class='chip"+(on?" on":"")+"' onclick=\"pickAc('"+a.id+"')\"><span>"+(a.id==="efectivo"?"💵":"🏦")+"</span>"+e(a.name)+"</button>"}).join("")+"<button class='chip"+(ed.pay==="tarjeta"?" on":"")+"' onclick=\"pick('pay','tarjeta')\"><span>💳</span>Tarjeta de crédito</button></div>";
+if(ed.pay==="efectivo"||ed.pay==="cuenta"){var ai=ed.pay==="efectivo"?"efectivo":ed.acct;h+="<p class='msg'>Saldo en "+e(acct(ai))+": <b>"+M$(bal(ai))+"</b></p>"}if(ed.pay==="tarjeta")h+=S.cards.length?"<label>¿Con cuál tarjeta?</label><select id='fc' onchange='dl()'><option value=''>Sin especificar</option>"+S.cards.map(function(c){return"<option value='"+c.id+"'"+(c.id===ed.card?" selected":"")+">"+e(c.name)+"</option>"}).join("")+"</select><p class='msg' id='dl'></p>":"<p class='msg'>Aún no tienes tarjetas. Agrégalas en Ajustes y vuelve a editar este gasto.</p>";
 h+="<label>Fecha</label><input type='date' id='fd' value='"+ed.date+"'><label>Nota (opcional)</label><input id='fo' maxlength='60' placeholder='Ej. Almuerzo con mamá' value=\""+e(ed.note)+"\">";
 h+="<div class='btns'><button class='btn alt' onclick='cancel()'>Cancelar</button><button class='btn' onclick='svTx()'>Guardar</button></div>"+(ed.id?"<button class='btn del w' onclick='rmTx(this)'>Eliminar gasto</button>":"");
 return h}
@@ -199,7 +205,7 @@ if(ed.k==="cat"){
 return "<h1>"+(ed.id?"Editar categoría":"Nueva categoría")+"</h1><div class='card' style='padding:6px 14px 16px'><label>Nombre</label><input id='fn' maxlength='24' value=\""+e(ed.name)+"\" placeholder='Ej. Mascotas'><label>Emoji</label><input id='fe' maxlength='4' value='"+e(ed.emoji)+"'><label>Color</label><div class='sw'>"+PAL.map(function(c){return'<button style="--c:'+c+'" class="'+(c===ed.color?"on":"")+'" aria-label="Color" onclick="pick(\'color\',\''+c+'\')"></button>'}).join("")+"</div></div><div class='btns'><button class='btn alt' onclick='cancel()'>Cancelar</button><button class='btn' onclick='svCat()'>Guardar</button></div>"+(ed.id?"<button class='btn del w' onclick='rmCat(this)'>Eliminar categoría</button><p class='msg'>Los gastos de esta categoría quedarán como Sin categoría.</p>":"")}
 return "<h1>"+(ed.id?"Editar tarjeta":"Nueva tarjeta")+"</h1><div class='card' style='padding:6px 14px 16px'><label>Nombre</label><input id='fn' maxlength='30' value=\""+e(ed.name)+"\" placeholder='Ej. Visa Bancolombia'></div><div class='btns'><button class='btn alt' onclick='cancel()'>Cancelar</button><button class='btn' onclick='svCard()'>Guardar</button></div>"+(ed.id?"<button class='btn del w' onclick='rmCard(this)'>Eliminar tarjeta</button>":"")}
 function svTx(){keep();var amt=Number(digits(ed.amt));if(!amt){$("fa").focus();return}if(!ed.date){$("fd").focus();return}
-var o={id:ed.id||rid("t"),amt:amt,cat:ed.cat,pay:ed.pay,card:ed.pay==="tarjeta"?ed.card:"",date:ed.date,note:ed.note.trim()},i=S.tx.findIndex(function(t){return t.id===ed.id});
+var o={id:ed.id||rid("t"),amt:amt,cat:ed.cat,pay:ed.pay,acct:ed.pay==="cuenta"?ed.acct:"",card:ed.pay==="tarjeta"?ed.card:"",date:ed.date,note:ed.note.trim()},i=S.tx.findIndex(function(t){return t.id===ed.id});
 if(i>=0)S.tx[i]=o;else S.tx.push(o);Y=+o.date.slice(0,4);Mo=+o.date.slice(5,7)-1;save();ed=null;tab="g";go()}
 function sure(b){if(b.dataset.s){return true}b.dataset.s=1;b.textContent="Toca otra vez para confirmar";return false}
 function rmTx(b){if(!sure(b))return;S.tx=S.tx.filter(function(t){return t.id!==ed.id});save();ed=null;go()}
@@ -217,7 +223,7 @@ function ao(sel){return S.accts.map(function(a){return"<option value='"+a.id+"'"
 function bal(id){var a=S.accts.find(function(x){return x.id===id});if(!a)return 0;var b=+a.init||0;
 S.mv.forEach(function(m){if(m.to===id)b+=m.amt;if(m.from===id)b-=m.amt});
 S.inv.forEach(function(v){if(v.from===id)b-=v.amt;if(v.st==="cerrada"&&v.to===id)b+=v.out});
-if(id==="efectivo")b-=sum(S.tx.filter(function(t){return t.pay==="efectivo"}));
+if(id==="efectivo")b-=sum(S.tx.filter(function(t){return t.pay==="efectivo"}));S.tx.forEach(function(t){if(t.pay==="cuenta"&&t.acct===id)b-=t.amt});
 return b}
 function ivCalc(v){var r=v.rate/100,gain=v.amt*(Math.pow(1+r,v.days/365)-1),s=new Date(v.start+"T00:00:00"),f=new Date(s);f.setDate(f.getDate()+v.days);
 var el=Math.max(0,Math.floor((new Date(today()+"T00:00:00")-s)/864e5));
@@ -246,7 +252,7 @@ function bts(sv,rm){return"<div class='btns'><button class='btn alt' onclick='ca
 function rmMv(b){if(!sure(b))return;S.mv=S.mv.filter(function(m){return m.id!==ed.id});save();ed=null;go()}
 function fAc(){return"<h1>"+(ed.id?"Editar cuenta":"Nueva cuenta")+"</h1><div class='card' style='padding:6px 14px 16px'><label>Nombre</label><input id='fn' maxlength='30' value=\""+e(ed.name)+"\" placeholder='Ej. Ahorros Bancolombia'><label>Saldo inicial (lo que tenías antes de registrar movimientos)</label><input id='fa' inputmode='numeric' placeholder='$ 0' value='"+ed.init+"' oninput='this.value=dots(this.value)'></div><p class='msg neg' id='ma'></p>"+bts("svAc",ed.id&&ed.id!=="efectivo"?"rmAc":"")}
 function svAc(){keep();var n=ed.name.trim();if(!n){$("fn").focus();return}var o={id:ed.id||rid("a"),name:n,init:Number(digits(ed.init))||0},i=S.accts.findIndex(function(a){return a.id===ed.id});if(i>=0)S.accts[i]=o;else S.accts.push(o);save();ed=null;go()}
-function rmAc(b){var u=S.mv.some(function(m){return m.from===ed.id||m.to===ed.id})||S.inv.some(function(v){return v.from===ed.id||v.to===ed.id});if(u){$("ma").textContent="No se puede eliminar: tiene movimientos o inversiones. Puedes cambiarle el nombre.";return}if(!sure(b))return;S.accts=S.accts.filter(function(a){return a.id!==ed.id});save();ed=null;go()}
+function rmAc(b){var u=S.mv.some(function(m){return m.from===ed.id||m.to===ed.id})||S.inv.some(function(v){return v.from===ed.id||v.to===ed.id})||S.tx.some(function(t){return t.acct===ed.id})||S.rec.some(function(r){return r.acct===ed.id});if(u){$("ma").textContent="No se puede eliminar: tiene gastos, movimientos o inversiones. Puedes cambiarle el nombre.";return}if(!sure(b))return;S.accts=S.accts.filter(function(a){return a.id!==ed.id});save();ed=null;go()}
 function fInv(){var K=["CDT","Fondo de inversión","Fiducia","Acciones o ETF","Bono","Otro"];
 return"<h1>"+(ed.id?"Editar inversión":"Nueva inversión")+"</h1><div class='card' style='padding:6px 14px 16px'><label>Nombre</label><input id='fn' maxlength='40' value=\""+e(ed.name)+"\" placeholder='Ej. CDT Bancolombia'><label>Tipo</label><select id='fk'>"+K.map(function(k){return"<option"+(k===ed.kind?" selected":"")+">"+k+"</option>"}).join("")+"</select></div>"+amtBox("Capital invertido (COP)",ed.amt)+
 "<label>Sale de la cuenta</label><select id='ff'>"+ao(ed.from)+"</select><label>Fecha de inicio</label><input type='date' id='fd' value='"+ed.start+"'><label>Plazo</label><div class='btns' style='margin-top:0'><input id='fp' inputmode='decimal' value='"+e(ed.n)+"'><select id='fu'><option"+(ed.unit==="meses"?" selected":"")+">meses</option><option"+(ed.unit==="días"?" selected":"")+">días</option></select></div><label>Tasa de rendimiento (% efectiva anual)</label><input id='fr' inputmode='decimal' placeholder='Ej. 10,5' value='"+e(ed.rate)+"'><p class='msg neg' id='mi'></p>"+bts("svInv",ed.id?"rmInv":"")}
@@ -276,8 +282,8 @@ return'<button class="row" onclick="edMv(\'\',\''+m.id+'\')"><span class="av" st
 function vc(){var tot=0,inv=0,dt=0,sm=[];S.accts.forEach(function(a){tot+=bal(a.id)});S.inv.forEach(function(v){if(v.st!=="cerrada")inv+=v.amt});S.cards.forEach(function(c){if(c.d0)dt+=Math.max(0,debt(c))});
 if(inv)sm.push("Invertidos: "+M$(inv));if(dt)sm.push("Deuda en tarjetas: "+M$(dt));
 var h="<h1>Cuentas</h1><section class='hero'><span>Dinero disponible</span><strong>"+M$(tot)+"</strong><small>"+(sm.length?sm.join(" · "):"Suma de todas tus cuentas")+"</small></section><div class='btns'><button class='btn' onclick=\"edMv('ingreso')\">💰 Ingreso</button><button class='btn alt' onclick=\"edMv('transfer')\">⇄ Transferir</button>"+(S.cards.length?"<button class='btn alt' onclick=\"edMv('pagotc')\">💳 Pagar</button>":"")+"</div><h2>Mis cuentas</h2><div class='card'>";
-h+=S.accts.map(function(a){var b=bal(a.id);return'<div class="row2"><span class="av" style="--c:#4f46e5">'+(a.id==="efectivo"?"💵":"🏦")+'</span><span class="grow"><b>'+e(a.name)+"</b>"+(a.id==="efectivo"?"<small>Cada gasto en efectivo lo descuenta</small>":"")+'</span><b class="amt'+(b<0?" neg":"")+'">'+M$(b)+'</b><button class="ib" onclick="edAc(\''+a.id+'\')" aria-label="Editar '+e(a.name)+'">✎</button></div>'}).join("")+"</div><button class='btn alt w' onclick='edAc()'>+ Nueva cuenta</button>";
-if(bal("efectivo")<0)h+="<p class='msg neg'>Tu efectivo quedó en negativo: registra un ingreso o transfiere dinero a Efectivo.</p>";
+h+=S.accts.map(function(a){var b=bal(a.id);return'<div class="row2"><span class="av" style="--c:#4f46e5">'+(a.id==="efectivo"?"💵":"🏦")+'</span><span class="grow"><b>'+e(a.name)+"</b>"+(a.id==="efectivo"?"<small>Cada gasto en efectivo lo descuenta</small>":"<small>Descuenta los gastos que pagues con esta cuenta</small>")+'</span><b class="amt'+(b<0?" neg":"")+'">'+M$(b)+'</b><button class="ib" onclick="edAc(\''+a.id+'\')" aria-label="Editar '+e(a.name)+'">✎</button></div>'}).join("")+"</div><button class='btn alt w' onclick='edAc()'>+ Nueva cuenta</button>";
+var ng=S.accts.filter(function(a){return bal(a.id)<0}).map(function(a){return e(a.name)});if(ng.length)h+="<p class='msg neg'>Quedó en negativo: "+ng.join(", ")+". Registra un ingreso o transfiere dinero a esa cuenta.</p>";
 h+="<h2>Tarjetas de crédito</h2>"+(S.cards.length?"<div class='card'>"+S.cards.map(tcRow).join("")+"</div>":"<p class='msg'>Agrega tus tarjetas en Ajustes para ver cuánto debes en cada una.</p>");
 var ms=S.mv.slice().sort(function(a,b){return a.date<b.date?1:a.date>b.date?-1:(a.id<b.id?1:-1)}).slice(0,20);
 h+="<h2>Movimientos</h2>";
@@ -303,19 +309,19 @@ function pend(){var L=[];S.rec.forEach(function(r){dues(r).forEach(function(d){v
 var h="<button class='btn alt w' onclick=\"edMv('ingreso')\">💰 Registrar ingreso</button>";if(!L.length)return h;
 return h+"<h2>Por confirmar ("+L.length+")</h2><div class='card'>"+L.map(function(x){var c=cat(x.r.cat);return'<div class="row2"><span class="av" style="--c:'+c.color+'">'+c.emoji+'</span><span class="grow"><b>'+e(x.r.name)+"</b><small>"+fdt(x.d)+" · "+M$(x.r.amt)+'</small></span><button class="ib" aria-label="No se hizo" onclick="rc(\''+x.k+'\',0)">✕</button><button class="ib" aria-label="Sí se hizo" style="background:var(--ac);color:var(--on)" onclick="rc(\''+x.k+'\',1)">✓</button></div>'}).join("")+"</div><p class='msg'>¿Se hicieron estos pagos programados? ✓ los registra como gasto y ✕ los omite.</p>"}
 function rc(k,ok){var p=k.split("|"),r=S.rec.find(function(x){return x.id===p[0]});if(!r||S.rl[k])return;S.rl[k]=ok?"ok":"no";
-if(ok)S.tx.push({id:rid("t"),amt:r.amt,cat:r.cat,pay:r.pay,card:r.pay==="tarjeta"?r.card:"",date:p[1],note:r.name+" (recurrente)"});save();render()}
+if(ok)S.tx.push({id:rid("t"),amt:r.amt,cat:r.cat,pay:r.pay,acct:r.pay==="cuenta"?r.acct:"",card:r.pay==="tarjeta"?r.card:"",date:p[1],note:r.name+" (recurrente)"});save();render()}
 function recList(){var h="<h2>Gastos recurrentes</h2>";h+=S.rec.length?"<div class='card'>"+S.rec.map(function(r){var c=cat(r.cat);return'<div class="row2"><span class="av" style="--c:'+c.color+'">'+c.emoji+'</span><span class="grow"><b>'+e(r.name)+"</b><small>"+M$(r.amt)+" · "+(r.freq==="m"?"cada mes, día "+r.day:FQ[r.freq])+'</small></span><button class="ib" onclick="edRec(\''+r.id+'\')" aria-label="Editar">✎</button></div>'}).join("")+"</div>":"<p class='msg'>Programa pagos fijos (arriendo, servicios, cuotas). Cuando llegue la fecha, la app te pedirá confirmar en la pestaña Gastos si se hicieron.</p>";return h+"<button class='btn alt w' onclick='edRec()'>+ Nuevo gasto recurrente</button>"}
-function edRec(id){var r=S.rec.find(function(x){return x.id===id});ed=r?{k:"rec",id:id,name:r.name,amt:dots(r.amt),cat:r.cat,pay:r.pay,card:r.card||"",freq:r.freq,day:String(r.day||1),start:r.start}:{k:"rec",name:"",amt:"",cat:S.cats[0]?S.cats[0].id:"",pay:"efectivo",card:"",freq:"q",day:"1",start:today()};go()}
+function edRec(id){var r=S.rec.find(function(x){return x.id===id});ed=r?{k:"rec",id:id,name:r.name,amt:dots(r.amt),cat:r.cat,pay:r.pay,acct:r.acct||"",card:r.card||"",freq:r.freq,day:String(r.day||1),start:r.start}:{k:"rec",name:"",amt:"",cat:S.cats[0]?S.cats[0].id:"",pay:"efectivo",acct:"",card:"",freq:"q",day:"1",start:today()};go()}
 function fRec(){var h="<h1>"+(ed.id?"Editar recurrente":"Gasto recurrente")+"</h1><div class='card' style='padding:6px 14px 16px'><label>Nombre</label><input id='fn' maxlength='40' value=\""+e(ed.name)+"\" placeholder='Ej. Arriendo'></div>"+amtBox("Monto (COP)",ed.amt);
 h+="<label>Categoría</label><select id='fcat'>"+S.cats.map(function(c){return"<option value='"+c.id+"'"+(c.id===ed.cat?" selected":"")+">"+c.emoji+" "+e(c.name)+"</option>"}).join("")+"</select>";
-h+="<label>Medio de pago</label><select onchange=\"pick('pay',this.value)\"><option value='efectivo'"+(ed.pay==="efectivo"?" selected":"")+">Efectivo</option><option value='tarjeta'"+(ed.pay==="tarjeta"?" selected":"")+">Tarjeta</option></select>";
+h+="<label>Medio de pago</label><select onchange=\"pickRP(this.value)\"><option value='efectivo'"+(ed.pay==="efectivo"?" selected":"")+">💵 Efectivo</option>"+S.accts.filter(function(a){return a.id!=="efectivo"}).map(function(a){return"<option value='a:"+a.id+"'"+(ed.pay==="cuenta"&&ed.acct===a.id?" selected":"")+">🏦 "+e(a.name)+"</option>"}).join("")+"<option value='tarjeta'"+(ed.pay==="tarjeta"?" selected":"")+">💳 Tarjeta de crédito</option></select>";
 if(ed.pay==="tarjeta")h+=S.cards.length?"<label>¿Con cuál tarjeta?</label><select id='fcard'>"+S.cards.map(function(c){return"<option value='"+c.id+"'"+(c.id===ed.card?" selected":"")+">"+e(c.name)+"</option>"}).join("")+"</select>":"<p class='msg'>Primero agrega una tarjeta en Ajustes.</p>";
 h+="<label>Frecuencia</label><select onchange=\"pick('freq',this.value)\">"+Object.keys(FQ).map(function(k){return"<option value='"+k+"'"+(k===ed.freq?" selected":"")+">"+FQ[k]+"</option>"}).join("")+"</select>";
 if(ed.freq==="m")h+="<label>Día del mes (1 a 31)</label><input id='fy' inputmode='numeric' maxlength='2' value='"+e(ed.day)+"'>";
 h+="<label>Empieza el</label><input type='date' id='fd' value='"+ed.start+"'><p class='msg'>Desde esa fecha, en cada fecha de pago la app te preguntará si se hizo. Si eliges una fecha pasada, te preguntará también por las anteriores.</p>";
 return h+bts("svRec",ed.id?"rmRec":"")}
 function svRec(){keep();var amt=Number(digits(ed.amt)),n=ed.name.trim();if(!n){$("fn").focus();return}if(!amt){$("fa").focus();return}if(!ed.start){$("fd").focus();return}
-var dy=parseInt(ed.day,10),o={id:ed.id||rid("r"),name:n,amt:amt,cat:ed.cat,pay:ed.pay,card:ed.pay==="tarjeta"?ed.card:"",freq:ed.freq,day:dy>=1&&dy<=31?dy:1,start:ed.start},i=S.rec.findIndex(function(r){return r.id===ed.id});if(i>=0)S.rec[i]=o;else S.rec.push(o);save();ed=null;go()}
+var dy=parseInt(ed.day,10),o={id:ed.id||rid("r"),name:n,amt:amt,cat:ed.cat,pay:ed.pay,acct:ed.pay==="cuenta"?ed.acct:"",card:ed.pay==="tarjeta"?ed.card:"",freq:ed.freq,day:dy>=1&&dy<=31?dy:1,start:ed.start},i=S.rec.findIndex(function(r){return r.id===ed.id});if(i>=0)S.rec[i]=o;else S.rec.push(o);save();ed=null;go()}
 function rmRec(b){if(!sure(b))return;S.rec=S.rec.filter(function(r){return r.id!==ed.id});save();ed=null;go()}
 document.querySelectorAll("nav button").forEach(function(b){b.onclick=function(){tab=b.dataset.t;go()}});
 $("fab").onclick=function(){edTx()};
