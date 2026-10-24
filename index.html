@@ -94,6 +94,9 @@ nav button{font-size:11px;padding:7px 2px}
 .ic{padding:14px;margin-bottom:12px}
 .seg2{display:flex}
 .split2{flex-wrap:wrap;gap:6px}
+.bd{display:inline-block;padding:4px 10px;border-radius:20px;font-size:12.5px;font-weight:800;margin-top:10px}
+.bd.ok{background:color-mix(in srgb,#10b981 18%,transparent);color:#10b981}
+.bd.no{background:color-mix(in srgb,#e11d48 15%,transparent);color:var(--bad)}
 </style>
 </head>
 <body>
@@ -104,16 +107,17 @@ nav button{font-size:11px;padding:7px 2px}
 <button data-t="r"><span>📊</span>Resumen</button>
 <button data-t="c"><span>🏦</span>Cuentas</button>
 <button data-t="i"><span>📈</span>Inversión</button>
+<button data-t="m"><span>🎯</span>Metas</button>
 <button data-t="a"><span>⚙️</span>Ajustes</button>
 </nav>
 <script>
 var MN=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
 var PAL=["#4f46e5","#e11d48","#f59e0b","#10b981","#0ea5e9","#a855f7","#f97316","#64748b"];
-var D={budget:0,accts:[{id:"efectivo",name:"Efectivo",init:0}],mv:[],inv:[],rec:[],rl:{},cards:[],tx:[],cats:[["Comida","🍽️"],["Mercado","🛒"],["Transporte","🚌"],["Vivienda","🏠"],["Servicios","💡"],["Salud","💊"],["Ocio","🎬"],["Ropa","👕"],["Educación","📚"],["Otros","📦"]].map(function(c,i){return{id:"c"+i,name:c[0],emoji:c[1],color:PAL[i%8]}})};
+var D={budget:0,goals:[],gc:[],gl:{},accts:[{id:"efectivo",name:"Efectivo",init:0}],mv:[],inv:[],rec:[],rl:{},cards:[],tx:[],cats:[["Comida","🍽️"],["Mercado","🛒"],["Transporte","🚌"],["Vivienda","🏠"],["Servicios","💡"],["Salud","💊"],["Ocio","🎬"],["Ropa","👕"],["Educación","📚"],["Otros","📦"]].map(function(c,i){return{id:"c"+i,name:c[0],emoji:c[1],color:PAL[i%8]}})};
 var S=load(),tab="g",ed=null,now=new Date(),Y=now.getFullYear(),Mo=now.getMonth();
 var $=function(i){return document.getElementById(i)};
 function load(){try{var r=localStorage.getItem("gastos-v1");if(r){var o=JSON.parse(r);if(o&&Array.isArray(o.tx)&&Array.isArray(o.cats))return norm(o)}}catch(x){}return JSON.parse(JSON.stringify(D))}
-function norm(o){var s={budget:o.budget||0,cards:o.cards||[],tx:o.tx||[],cats:o.cats||[],accts:o.accts||[],mv:o.mv||[],inv:o.inv||[],rec:o.rec||[],rl:o.rl||{}};if(!s.accts.some(function(a){return a.id==="efectivo"}))s.accts.unshift({id:"efectivo",name:"Efectivo",init:0});return s}
+function norm(o){var s={budget:o.budget||0,cards:o.cards||[],tx:o.tx||[],cats:o.cats||[],accts:o.accts||[],mv:o.mv||[],inv:o.inv||[],rec:o.rec||[],rl:o.rl||{},goals:o.goals||[],gc:o.gc||[],gl:o.gl||{}};if(!s.accts.some(function(a){return a.id==="efectivo"}))s.accts.unshift({id:"efectivo",name:"Efectivo",init:0});return s}
 function save(){try{localStorage.setItem("gastos-v1",JSON.stringify(S))}catch(x){}}
 function e(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
 var NF=new Intl.NumberFormat("es-CO",{style:"currency",currency:"COP",maximumFractionDigits:0});
@@ -134,7 +138,7 @@ function render(){
 document.querySelectorAll("nav button").forEach(function(b){b.className=b.dataset.t===tab?"on":""});
 $("fab").style.display=(!ed&&tab==="g")?"flex":"none";
 $("nav").style.display=ed?"none":"flex";
-$("app").innerHTML=ed?form():({g:vg,r:vr,c:vc,i:vi,a:va})[tab]();if(ed&&ed.k==="tx")dl();
+$("app").innerHTML=ed?form():({g:vg,r:vr,c:vc,i:vi,m:vm,a:va})[tab]();if(ed&&ed.k==="tx")dl();
 }
 function go(){window.scrollTo(0,0);render()}
 function vg(){
@@ -185,14 +189,14 @@ S.tx.slice().sort(function(a,b){return a.date<b.date?-1:1}).forEach(function(t){
 var t=$("bk");t.value=L.join("\n");cp("bk");$("mr").textContent="Tabla copiada: pégala en Excel o Google Sheets."}
 function edTx(id){var t=S.tx.find(function(x){return x.id===id});ed=t?{k:"tx",id:id,amt:dots(t.amt),cat:t.cat,pay:t.pay,acct:t.acct||"",card:t.card||"",date:t.date,note:t.note||""}:{k:"tx",amt:"",cat:S.cats[0]?S.cats[0].id:"",pay:"efectivo",acct:"",card:"",date:today(),note:""};go()}
 function edCat(id){var c=S.cats.find(function(x){return x.id===id});ed=c?{k:"cat",id:id,name:c.name,emoji:c.emoji,color:c.color}:{k:"cat",name:"",emoji:"🏷️",color:PAL[S.cats.length%8]};go()}
-function keep(){if(["mv","acct","inv","invc","kard","rec"].indexOf(ed.k)>=0)return keep2();if(ed.k==="tx"){ed.amt=$("fa").value;ed.date=$("fd").value;ed.note=$("fo").value;if($("fc"))ed.card=$("fc").value}else if(ed.k==="cat"){ed.name=$("fn").value;ed.emoji=$("fe").value}else{ed.name=$("fn").value}}
+function keep(){if(["mv","acct","inv","invc","kard","rec","goal","gc"].indexOf(ed.k)>=0)return keep2();if(ed.k==="tx"){ed.amt=$("fa").value;ed.date=$("fd").value;ed.note=$("fo").value;if($("fc"))ed.card=$("fc").value}else if(ed.k==="cat"){ed.name=$("fn").value;ed.emoji=$("fe").value}else{ed.name=$("fn").value}}
 function pickAc(id){keep();ed.pay=id==="efectivo"?"efectivo":"cuenta";ed.acct=id==="efectivo"?"":id;render()}
 function pickRP(v){keep();if(v.indexOf("a:")===0){ed.pay="cuenta";ed.acct=v.slice(2)}else ed.pay=v;if(ed.pay==="tarjeta"&&!ed.card&&S.cards.length)ed.card=S.cards[0].id;render()}
 function pyX(t){return t.pay==="tarjeta"?"Tarjeta"+(cardName(t.card)?" · "+e(cardName(t.card)):""):t.pay==="cuenta"?e(acct(t.acct)):"Efectivo"}
 function pick(k,v){keep();ed[k]=v;if(k==="pay"&&v==="tarjeta"&&(ed.k==="tx"||ed.k==="rec")&&!ed.card&&S.cards.length)ed.card=S.cards[0].id;render()}
 function cancel(){ed=null;render()}
 function form(){
-if(ed.k==="kard")return fKard();if(ed.k==="rec")return fRec();if(ed.k==="mv")return fMv();if(ed.k==="acct")return fAc();if(ed.k==="inv")return fInv();if(ed.k==="invc")return fInvc();
+if(ed.k==="goal")return fGoal();if(ed.k==="gc")return fGc();if(ed.k==="kard")return fKard();if(ed.k==="rec")return fRec();if(ed.k==="mv")return fMv();if(ed.k==="acct")return fAc();if(ed.k==="inv")return fInv();if(ed.k==="invc")return fInvc();
 if(ed.k==="tx"){
 var h="<h1>"+(ed.id?"Editar gasto":"Nuevo gasto")+"</h1><div class='card' style='padding:14px'><label style='margin:0;text-align:center'>Monto (COP)</label><input class='big' id='fa' inputmode='numeric' placeholder='$ 0' value='"+ed.amt+"' oninput='this.value=dots(this.value);dl()'></div>";
 h+="<label>Categoría</label><div class='chips'>"+S.cats.map(function(c){return'<button class="chip'+(c.id===ed.cat?" on":"")+'" style="--c:'+c.color+'" onclick="pick(\'cat\',\''+c.id+'\')"><span>'+c.emoji+"</span>"+e(c.name)+"</button>"}).join("")+"</div>";
@@ -224,6 +228,7 @@ function bal(id){var a=S.accts.find(function(x){return x.id===id});if(!a)return 
 S.mv.forEach(function(m){if(m.to===id)b+=m.amt;if(m.from===id)b-=m.amt});
 S.inv.forEach(function(v){if(v.from===id)b-=v.amt;if(v.st==="cerrada"&&v.to===id)b+=v.out});
 if(id==="efectivo")b-=sum(S.tx.filter(function(t){return t.pay==="efectivo"}));S.tx.forEach(function(t){if(t.pay==="cuenta"&&t.acct===id)b-=t.amt});
+S.gc.forEach(function(p){if(p.acct===id)b+=(p.kind==="r"?p.amt:-p.amt)});
 return b}
 function ivCalc(v){var r=v.rate/100,gain=v.amt*(Math.pow(1+r,v.days/365)-1),s=new Date(v.start+"T00:00:00"),f=new Date(s);f.setDate(f.getDate()+v.days);
 var el=Math.max(0,Math.floor((new Date(today()+"T00:00:00")-s)/864e5));
@@ -246,13 +251,15 @@ else if(ed.k==="acct"){ed.name=g("fn");ed.init=g("fa")}
 else if(ed.k==="inv"){ed.name=g("fn");ed.kind=g("fk");ed.amt=g("fa");ed.from=g("ff");ed.start=g("fd");ed.n=g("fp");ed.unit=g("fu");ed.rate=g("fr")}
 else if(ed.k==="kard"){ed.name=g("fn");ed.debt=g("fa");ed.d0=g("fd");ed.cut=g("fc");ed.rate=g("fr")}
 else if(ed.k==="rec"){ed.name=g("fn");ed.amt=g("fa");ed.cat=g("fcat");if($("fcard"))ed.card=g("fcard");if($("fy"))ed.day=g("fy");ed.start=g("fd")}
+else if(ed.k==="goal"){ed.name=g("fn");ed.emoji=g("fe");ed.target=g("fa");ed.deadline=g("fd");ed.s0=g("fs");ed.start=g("f1");if($("fq"))ed.aamt=g("fq");if($("fy"))ed.aday=g("fy");if($("f2"))ed.astart=g("f2");if($("ff"))ed.aacct=g("ff")}
+else if(ed.k==="gc"){ed.amt=g("fa");ed.date=g("fd");ed.note=g("fo");ed.goal=g("fg");ed.kind=g("fk");ed.acct=g("ff")}
 else{ed.out=g("fa");ed.to=g("ft");ed.end=g("fd")}}
 function amtBox(l,v){return"<div class='card' style='padding:14px'><label style='margin:0;text-align:center'>"+l+"</label><input class='big' id='fa' inputmode='numeric' placeholder='$ 0' value='"+v+"' oninput='this.value=dots(this.value)'></div>"}
 function bts(sv,rm){return"<div class='btns'><button class='btn alt' onclick='cancel()'>Cancelar</button><button class='btn' onclick='"+sv+"()'>Guardar</button></div>"+(rm?"<button class='btn del w' onclick='"+rm+"(this)'>Eliminar</button>":"")}
 function rmMv(b){if(!sure(b))return;S.mv=S.mv.filter(function(m){return m.id!==ed.id});save();ed=null;go()}
 function fAc(){return"<h1>"+(ed.id?"Editar cuenta":"Nueva cuenta")+"</h1><div class='card' style='padding:6px 14px 16px'><label>Nombre</label><input id='fn' maxlength='30' value=\""+e(ed.name)+"\" placeholder='Ej. Ahorros Bancolombia'><label>Saldo inicial (lo que tenías antes de registrar movimientos)</label><input id='fa' inputmode='numeric' placeholder='$ 0' value='"+ed.init+"' oninput='this.value=dots(this.value)'></div><p class='msg neg' id='ma'></p>"+bts("svAc",ed.id&&ed.id!=="efectivo"?"rmAc":"")}
 function svAc(){keep();var n=ed.name.trim();if(!n){$("fn").focus();return}var o={id:ed.id||rid("a"),name:n,init:Number(digits(ed.init))||0},i=S.accts.findIndex(function(a){return a.id===ed.id});if(i>=0)S.accts[i]=o;else S.accts.push(o);save();ed=null;go()}
-function rmAc(b){var u=S.mv.some(function(m){return m.from===ed.id||m.to===ed.id})||S.inv.some(function(v){return v.from===ed.id||v.to===ed.id})||S.tx.some(function(t){return t.acct===ed.id})||S.rec.some(function(r){return r.acct===ed.id});if(u){$("ma").textContent="No se puede eliminar: tiene gastos, movimientos o inversiones. Puedes cambiarle el nombre.";return}if(!sure(b))return;S.accts=S.accts.filter(function(a){return a.id!==ed.id});save();ed=null;go()}
+function rmAc(b){var u=S.mv.some(function(m){return m.from===ed.id||m.to===ed.id})||S.inv.some(function(v){return v.from===ed.id||v.to===ed.id})||S.tx.some(function(t){return t.acct===ed.id})||S.rec.some(function(r){return r.acct===ed.id})||S.gc.some(function(p){return p.acct===ed.id});if(u){$("ma").textContent="No se puede eliminar: tiene gastos, movimientos o inversiones. Puedes cambiarle el nombre.";return}if(!sure(b))return;S.accts=S.accts.filter(function(a){return a.id!==ed.id});save();ed=null;go()}
 function fInv(){var K=["CDT","Fondo de inversión","Fiducia","Acciones o ETF","Bono","Otro"];
 return"<h1>"+(ed.id?"Editar inversión":"Nueva inversión")+"</h1><div class='card' style='padding:6px 14px 16px'><label>Nombre</label><input id='fn' maxlength='40' value=\""+e(ed.name)+"\" placeholder='Ej. CDT Bancolombia'><label>Tipo</label><select id='fk'>"+K.map(function(k){return"<option"+(k===ed.kind?" selected":"")+">"+k+"</option>"}).join("")+"</select></div>"+amtBox("Capital invertido (COP)",ed.amt)+
 "<label>Sale de la cuenta</label><select id='ff'>"+ao(ed.from)+"</select><label>Fecha de inicio</label><input type='date' id='fd' value='"+ed.start+"'><label>Plazo</label><div class='btns' style='margin-top:0'><input id='fp' inputmode='decimal' value='"+e(ed.n)+"'><select id='fu'><option"+(ed.unit==="meses"?" selected":"")+">meses</option><option"+(ed.unit==="días"?" selected":"")+">días</option></select></div><label>Tasa de rendimiento (% efectiva anual)</label><input id='fr' inputmode='decimal' placeholder='Ej. 10,5' value='"+e(ed.rate)+"'><p class='msg neg' id='mi'></p>"+bts("svInv",ed.id?"rmInv":"")}
@@ -280,7 +287,7 @@ return'<div class="st"><div class="sr"><span class="av sm" style="--c:#4f46e5">�
 function mvRow(m){var T={transfer:["⇄","#0ea5e9",e(acct(m.from))+" → "+e(acct(m.to)),""],pagotc:["💳","#4f46e5","Pago a "+e(cardName(m.to)||"tarjeta")+" desde "+e(acct(m.from)),""],ingreso:["⬆️","#10b981","Ingreso a "+e(acct(m.to)),"+"]}[m.type]||["•","#64748b","Movimiento",""];
 return'<button class="row" onclick="edMv(\'\',\''+m.id+'\')"><span class="av" style="--c:'+T[1]+'">'+T[0]+'</span><span class="grow"><b>'+T[2]+"</b><small>"+fdt(m.date)+(m.note?" · "+e(m.note):"")+'</small></span><b class="amt'+(T[3]?" pos":"")+'">'+T[3]+M$(m.amt)+"</b></button>"}
 function vc(){var tot=0,inv=0,dt=0,sm=[];S.accts.forEach(function(a){tot+=bal(a.id)});S.inv.forEach(function(v){if(v.st!=="cerrada")inv+=v.amt});S.cards.forEach(function(c){if(c.d0)dt+=Math.max(0,debt(c))});
-if(inv)sm.push("Invertidos: "+M$(inv));if(dt)sm.push("Deuda en tarjetas: "+M$(dt));
+if(inv)sm.push("Invertidos: "+M$(inv));var sg=gtot().saved;if(sg)sm.push("En metas de ahorro: "+M$(sg));if(dt)sm.push("Deuda en tarjetas: "+M$(dt));
 var h="<h1>Cuentas</h1><section class='hero'><span>Dinero disponible</span><strong>"+M$(tot)+"</strong><small>"+(sm.length?sm.join(" · "):"Suma de todas tus cuentas")+"</small></section><div class='btns'><button class='btn' onclick=\"edMv('ingreso')\">💰 Ingreso</button><button class='btn alt' onclick=\"edMv('transfer')\">⇄ Transferir</button>"+(S.cards.length?"<button class='btn alt' onclick=\"edMv('pagotc')\">💳 Pagar</button>":"")+"</div><h2>Mis cuentas</h2><div class='card'>";
 h+=S.accts.map(function(a){var b=bal(a.id);return'<div class="row2"><span class="av" style="--c:#4f46e5">'+(a.id==="efectivo"?"💵":"🏦")+'</span><span class="grow"><b>'+e(a.name)+"</b>"+(a.id==="efectivo"?"<small>Cada gasto en efectivo lo descuenta</small>":"<small>Descuenta los gastos que pagues con esta cuenta</small>")+'</span><b class="amt'+(b<0?" neg":"")+'">'+M$(b)+'</b><button class="ib" onclick="edAc(\''+a.id+'\')" aria-label="Editar '+e(a.name)+'">✎</button></div>'}).join("")+"</div><button class='btn alt w' onclick='edAc()'>+ Nueva cuenta</button>";
 var ng=S.accts.filter(function(a){return bal(a.id)<0}).map(function(a){return e(a.name)});if(ng.length)h+="<p class='msg neg'>Quedó en negativo: "+ng.join(", ")+". Registra un ingreso o transfiere dinero a esa cuenta.</p>";
@@ -306,7 +313,7 @@ function dues(r){var out=[],s=new Date(r.start+"T00:00:00"),t=new Date(today()+"
 while(d<=t){var y=d.getFullYear(),m=d.getMonth(),L=new Date(y,m+1,0).getDate(),ys=r.freq==="q"?[15,L]:r.freq==="q1"?[15]:r.freq==="q2"?[L]:[Math.min(r.day||1,L)];
 ys.forEach(function(x){var dt=new Date(y,m,x);if(dt>=s&&dt<=t)out.push(ds(dt))});d=new Date(y,m+1,1)}return out}
 function pend(){var L=[];S.rec.forEach(function(r){dues(r).forEach(function(d){var k=r.id+"|"+d;if(!S.rl[k])L.push({r:r,d:d,k:k})})});L.sort(function(a,b){return a.d<b.d?-1:1});
-var h="<button class='btn alt w' onclick=\"edMv('ingreso')\">💰 Registrar ingreso</button>";if(!L.length)return h;
+var h="<button class='btn alt w' onclick=\"edMv('ingreso')\">💰 Registrar ingreso</button>";h+=gb();if(!L.length)return h;
 return h+"<h2>Por confirmar ("+L.length+")</h2><div class='card'>"+L.map(function(x){var c=cat(x.r.cat);return'<div class="row2"><span class="av" style="--c:'+c.color+'">'+c.emoji+'</span><span class="grow"><b>'+e(x.r.name)+"</b><small>"+fdt(x.d)+" · "+M$(x.r.amt)+'</small></span><button class="ib" aria-label="No se hizo" onclick="rc(\''+x.k+'\',0)">✕</button><button class="ib" aria-label="Sí se hizo" style="background:var(--ac);color:var(--on)" onclick="rc(\''+x.k+'\',1)">✓</button></div>'}).join("")+"</div><p class='msg'>¿Se hicieron estos pagos programados? ✓ los registra como gasto y ✕ los omite.</p>"}
 function rc(k,ok){var p=k.split("|"),r=S.rec.find(function(x){return x.id===p[0]});if(!r||S.rl[k])return;S.rl[k]=ok?"ok":"no";
 if(ok)S.tx.push({id:rid("t"),amt:r.amt,cat:r.cat,pay:r.pay,acct:r.pay==="cuenta"?r.acct:"",card:r.pay==="tarjeta"?r.card:"",date:p[1],note:r.name+" (recurrente)"});save();render()}
@@ -323,6 +330,101 @@ return h+bts("svRec",ed.id?"rmRec":"")}
 function svRec(){keep();var amt=Number(digits(ed.amt)),n=ed.name.trim();if(!n){$("fn").focus();return}if(!amt){$("fa").focus();return}if(!ed.start){$("fd").focus();return}
 var dy=parseInt(ed.day,10),o={id:ed.id||rid("r"),name:n,amt:amt,cat:ed.cat,pay:ed.pay,acct:ed.pay==="cuenta"?ed.acct:"",card:ed.pay==="tarjeta"?ed.card:"",freq:ed.freq,day:dy>=1&&dy<=31?dy:1,start:ed.start},i=S.rec.findIndex(function(r){return r.id===ed.id});if(i>=0)S.rec[i]=o;else S.rec.push(o);save();ed=null;go()}
 function rmRec(b){if(!sure(b))return;S.rec=S.rec.filter(function(r){return r.id!==ed.id});save();ed=null;go()}
+/* ===== METAS DE AHORRO ===== */
+function dd(s){return new Date(s+"T00:00:00")}
+function dbt(a,b){return Math.round((dd(b)-dd(a))/864e5)}
+function addD(s,n){var d=dd(s);d.setDate(d.getDate()+n);return ds(d)}
+function gnet(g,ex){var n=0;S.gc.forEach(function(p){if(p.goal===g.id&&p.id!==ex)n+=p.kind==="r"?-p.amt:p.amt});return n}
+function gsv(g,ex){return(+g.s0||0)+gnet(g,ex)}
+function gtot(){var s=0,t=0;S.goals.forEach(function(g){s+=gsv(g);t+=g.target});return{saved:s,target:t}}
+function qn(d1,d2,q){var n=0,d=new Date(d1.getFullYear(),d1.getMonth(),1);while(d<=d2){var y=d.getFullYear(),m=d.getMonth(),L=new Date(y,m+1,0).getDate(),xs=q?[15,L]:[L];xs.forEach(function(x){var dt=new Date(y,m,x);if(dt>=d1&&dt<=d2)n++});d=new Date(y,m+1,1)}return n}
+function gpace(g){var c=S.gc.filter(function(p){return p.goal===g.id});
+if(c.length){var net=gnet(g),f=c.reduce(function(m,p){return p.date<m?p.date:m},c[0].date),n=Math.max(30,dbt(f,today()));if(net>0)return{pd:net/n,src:"real"}}
+if(g.auto&&g.auto.amt){var k=g.auto.freq==="q"?2:1;return{pd:g.auto.amt*k/30.44,src:"plan"}}
+return null}
+function ginfo(g){var sv=gsv(g),rem=Math.max(0,g.target-sv),t=today(),dl=dbt(t,g.deadline),s0=+g.s0||0;
+var o={sv:sv,rem:rem,dl:dl,pct:g.target?Math.max(0,Math.min(100,Math.round(sv/g.target*100))):0,done:rem<=0};
+var tot=dbt(g.start,g.deadline),el=Math.max(0,Math.min(tot,dbt(g.start,t)));
+o.exp=tot>0?Math.round(s0+(g.target-s0)*el/tot):g.target;
+o.late=!o.done&&(dl<0||sv+g.target*0.01<o.exp);
+o.behind=Math.max(0,o.exp-sv);
+if(!o.done&&dl>=0){var d1=dd(t),d2=dd(g.deadline);o.nq=Math.max(1,qn(d1,d2,true));o.nm=Math.max(1,qn(d1,d2,false));o.pq=Math.ceil(rem/o.nq);o.pm=Math.ceil(rem/o.nm)}
+var p=gpace(g);o.pace=p;
+if(!o.done&&p){o.need=Math.ceil(rem/p.pd);o.eta=o.need>36500?null:addD(t,o.need)}
+return o}
+function gpend(){var L=[];S.goals.forEach(function(g){if(!g.auto||gsv(g)>=g.target)return;dues(g.auto).forEach(function(d){var k=g.id+"|"+d;if(!S.gl[k])L.push({g:g,d:d,k:k})})});L.sort(function(a,b){return a.d<b.d?-1:1});return L}
+function gb(){var p=gpend().length,late=S.goals.filter(function(g){return ginfo(g).late}).length;if(!p&&!late)return"";
+return"<button class='btn alt w' onclick=\"tab='m';go()\">🎯 "+(p?p+(p===1?" aporte de ahorro por confirmar":" aportes de ahorro por confirmar"):"")+(p&&late?" · ":"")+(late?late+(late===1?" meta atrasada":" metas atrasadas"):"")+"</button>"}
+function gco(k,ok){var p=k.split("|"),g=S.goals.find(function(x){return x.id===p[0]});if(!g||S.gl[k])return;S.gl[k]=ok?"ok":"no";
+if(ok&&g.auto){var a=Math.min(g.auto.amt,g.target-gsv(g));if(a>0)S.gc.push({id:rid("p"),goal:g.id,kind:"a",acct:S.accts.some(function(x){return x.id===g.auto.acct})?g.auto.acct:"efectivo",amt:a,date:p[1],note:"Aporte automático"})}
+save();render()}
+function edPend(k){var p=k.split("|"),g=S.goals.find(function(x){return x.id===p[0]});if(!g||!g.auto)return;ed={k:"gc",goal:g.id,kind:"a",acct:g.auto.acct,amt:dots(Math.min(g.auto.amt,Math.max(0,g.target-gsv(g)))),date:p[1],note:"Aporte automático",pk:k};go()}
+function frTxt(a){return a.freq==="m"?"cada mes, día "+a.day:FQ[a.freq]}
+function gcard(g){var i=ginfo(g),h='<div class="card ic" style="margin-top:12px"><div class="sr"><span class="av" style="--c:'+g.color+'">'+e(g.emoji)+'</span><span class="grow"><b>'+e(g.name)+'</b><small>Meta '+M$(g.target)+' · para el '+fdt(g.deadline)+'</small></span><button class="ib" onclick="edGoal(\''+g.id+'\')" aria-label="Editar '+e(g.name)+'">✎</button></div>';
+h+='<div class="kp"><div><b>'+M$(i.sv)+'</b><small>ahorrado</small></div><div><b>'+M$(i.rem)+'</b><small>te falta</small></div><div><b>'+i.pct+' %</b><small>logrado</small></div></div>';
+h+='<div class="bar" style="--c:'+(i.late?"#e11d48":"#10b981")+'"><i style="width:'+i.pct+'%"></i></div>';
+if(i.done)h+='<span class="bd ok">🎉 ¡Meta lograda!</span>';
+else if(i.late)h+='<span class="bd no">⚠️ Vas atrasada</span><br><small>'+(i.dl<0?"La fecha ya pasó y te faltan "+M$(i.rem)+". Puedes editar la meta y poner una fecha nueva.":"A hoy deberías llevar "+M$(i.exp)+" y llevas "+M$(i.sv)+". Para ir al día te faltan "+M$(i.behind)+".")+'</small>';
+else h+='<span class="bd ok">✓ Vas al día</span>';
+if(!i.done&&i.dl>=0){h+='<div class="kp"><div><b>'+M$(i.pq)+'</b><small>por quincena</small></div><div><b>'+M$(i.pm)+'</b><small>por mes</small></div><div><b>'+i.dl+'</b><small>días que faltan</small></div></div><small>Para llegar a tiempo: '+M$(i.pq)+' en cada una de las '+i.nq+' quincenas que quedan, o '+M$(i.pm)+' en cada uno de los '+i.nm+(i.nm===1?' mes':' meses')+' que quedan.</small>'}
+if(!i.done){if(i.pace){var by=i.pace.src==="real"?"Con tu ritmo real de ahorro":"Con tu aporte automático";
+if(i.eta){var df=dbt(g.deadline,i.eta);h+='<br><small>'+by+' llegarías el <b>'+fdt(i.eta)+'</b> '+(df<=0?'(a tiempo ✓).':'(unos '+df+' días después de tu fecha).')+'</small>'}else h+='<br><small>'+by+' tardarías más de 100 años. Sube el aporte.</small>'}
+else h+='<br><small>Haz tu primer aporte para estimar la fecha de llegada.</small>'}
+if(g.auto)h+='<br><small>🔁 Aporte automático: '+M$(g.auto.amt)+' · '+frTxt(g.auto)+' · desde '+e(acct(g.auto.acct))+'</small>';
+return h+'<div class="btns"><button class="btn" onclick="edAp(\''+g.id+'\',\'a\')">💰 Aportar</button><button class="btn alt" onclick="edAp(\''+g.id+'\',\'r\')">Retirar</button></div></div>'}
+function gcRow(p){var g=S.goals.find(function(x){return x.id===p.goal}),r=p.kind==="r";
+return'<button class="row" onclick="edGc(\''+p.id+'\')"><span class="av" style="--c:'+(g?g.color:"#64748b")+'">'+(r?"↩️":"🎯")+'</span><span class="grow"><b>'+(r?"Retiro de ":"Aporte a ")+e(g?g.name:"meta eliminada")+'</b><small>'+fdt(p.date)+" · "+(r?"a ":"desde ")+e(acct(p.acct))+(p.note?" · "+e(p.note):"")+'</small></span><b class="amt'+(r?"":" pos")+'">'+(r?"−":"+")+M$(p.amt)+'</b></button>'}
+function vm(){var G=S.goals,T=gtot(),P=gpend(),pc=T.target?Math.max(0,Math.min(100,Math.round(T.saved/T.target*100))):0;
+var h="<h1>Metas de ahorro</h1><section class='hero'><span>Ahorrado en tus metas</span><strong>"+M$(T.saved)+"</strong><small>"+(G.length?"de "+M$(T.target)+" · "+pc+" % logrado":"Crea tu primera meta: un viaje, un vehículo, lo que quieras")+"</small>"+(G.length?"<div class='pb'><i style='width:"+pc+"%'></i></div>":"")+"</section>";
+var late=G.filter(function(g){return ginfo(g).late}).map(function(g){return e(g.name)});
+if(late.length)h+="<p class='msg neg'>⚠️ Vas atrasada en: "+late.join(", ")+".</p>";
+h+="<div class='btns'><button class='btn' onclick='edGoal()'>+ Nueva meta</button>"+(G.length?"<button class='btn alt' onclick=\"edAp('','a')\">💰 Aportar</button>":"")+"</div>";
+if(P.length)h+="<h2>Por confirmar ("+P.length+")</h2><div class='card'>"+P.map(function(x){var g=x.g,a=Math.min(g.auto.amt,Math.max(0,g.target-gsv(g)));return'<div class="row2"><span class="av" style="--c:'+g.color+'">'+e(g.emoji)+'</span><span class="grow"><b>'+e(g.name)+'</b><small>'+fdt(x.d)+" · "+M$(a)+" desde "+e(acct(g.auto.acct))+'</small></span><button class="ib" aria-label="No se hizo" onclick="gco(\''+x.k+'\',0)">✕</button><button class="ib" aria-label="Cambiar monto o cuenta" onclick="edPend(\''+x.k+'\')">✎</button><button class="ib" aria-label="Sí se hizo" style="background:var(--ac);color:var(--on)" onclick="gco(\''+x.k+'\',1)">✓</button></div>'}).join("")+"</div><p class='msg'>¿Ya apartaste estos aportes? ✓ descuenta el dinero de la cuenta y lo suma a la meta. ✎ te deja cambiar el monto o la cuenta. ✕ lo omite.</p>";
+if(!G.length)h+="<p class='msg'>Una meta es algo para lo que quieres ahorrar. Le pones cuánto necesitas y para cuándo, y la app te dice cuánto apartar cada quincena o mes, cuándo llegarías a tu ritmo y si vas atrasada.</p>";
+G.forEach(function(g){h+=gcard(g)});
+var ms=S.gc.slice().sort(function(a,b){return a.date<b.date?1:a.date>b.date?-1:(a.id<b.id?1:-1)}).slice(0,15);
+if(ms.length)h+="<h2>Aportes y retiros</h2><div class='card'>"+ms.map(gcRow).join("")+"</div>";
+if(G.length)h+="<p class='msg'>Cómo se calcula: lo que falta se divide entre las quincenas (días 15 y fin de mes) o meses que quedan hasta tu fecha. La fecha estimada usa lo que de verdad has aportado desde tu primer aporte. Los aportes salen de la cuenta que elijas, por eso bajan el dinero disponible en Cuentas, y no cuentan como gasto.</p>";
+return h}
+function edGoal(id){var g=S.goals.find(function(x){return x.id===id}),a=g&&g.auto;
+ed=g?{k:"goal",id:id,name:g.name,emoji:g.emoji,target:dots(g.target),deadline:g.deadline,s0:g.s0?dots(g.s0):"",start:g.start,auto:a?"1":"0",aamt:a?dots(a.amt):"",freq:a?a.freq:"q",aday:String(a?a.day||1:1),astart:a?a.start:today(),aacct:a?a.acct:dAc()}
+:{k:"goal",name:"",emoji:"🎯",target:"",deadline:"",s0:"",start:today(),auto:"0",aamt:"",freq:"q",aday:"1",astart:today(),aacct:dAc()};go()}
+function dAc(){var a=S.accts.find(function(x){return x.id!=="efectivo"});return a?a.id:"efectivo"}
+function fGoal(){var h="<h1>"+(ed.id?"Editar meta":"Nueva meta")+"</h1><div class='card' style='padding:6px 14px 16px'><label>Nombre de la meta</label><input id='fn' maxlength='40' value=\""+e(ed.name)+"\" placeholder='Ej. Viaje a Europa'><label>Emoji</label><input id='fe' maxlength='4' value=\""+e(ed.emoji)+"\"></div>"+amtBox("¿Cuánto necesitas en total? (COP)",ed.target);
+h+="<div class='card' style='padding:6px 14px 16px;margin-top:12px'><label>¿Para qué fecha lo necesitas?</label><input type='date' id='fd' value='"+ed.deadline+"'><label>Ya tengo ahorrado para esta meta (opcional)</label><input id='fs' inputmode='numeric' placeholder='$ 0' value='"+ed.s0+"' oninput='this.value=dots(this.value)'><label>Empiezo a ahorrar el</label><input type='date' id='f1' value='"+ed.start+"'></div>";
+h+="<h2>Aporte automático</h2><div class='card' style='padding:6px 14px 16px'><label>¿Quieres programar aportes?</label><select onchange=\"pick('auto',this.value)\"><option value='0'"+(ed.auto==="0"?" selected":"")+">No, aportaré cuando yo quiera</option><option value='1'"+(ed.auto==="1"?" selected":"")+">Sí, programar aportes</option></select>";
+if(ed.auto==="1"){h+="<label>Monto de cada aporte (COP)</label><input id='fq' inputmode='numeric' placeholder='$ 0' value='"+ed.aamt+"' oninput='this.value=dots(this.value)'><label>Frecuencia</label><select onchange=\"pick('freq',this.value)\">"+Object.keys(FQ).map(function(k){return"<option value='"+k+"'"+(k===ed.freq?" selected":"")+">"+FQ[k]+"</option>"}).join("")+"</select>";
+if(ed.freq==="m")h+="<label>Día del mes (1 a 31)</label><input id='fy' inputmode='numeric' maxlength='2' value='"+e(ed.aday)+"'>";
+h+="<label>Empieza el</label><input type='date' id='f2' value='"+ed.astart+"'><label>Cuenta de donde sale normalmente</label><select id='ff'>"+ao(ed.aacct)+"</select></div><p class='msg'>En cada fecha la app te preguntará en la pestaña Metas (y con un aviso en Gastos) si ya apartaste ese dinero. Al confirmar con ✓ se descuenta de la cuenta y se suma a la meta. Antes de confirmar puedes cambiar el monto o la cuenta. Si eliges una fecha pasada, te preguntará también por las anteriores.</p>"}
+else h+="</div>";
+h+="<p class='msg neg' id='mg'></p>"+bts("svGoal",ed.id?"rmGoal":"");
+if(ed.id)h+="<p class='msg'>Si eliminas la meta, el dinero que habías aportado vuelve a las cuentas de donde salió.</p>";return h}
+function svGoal(){keep();var n=ed.name.trim(),t=Number(digits(ed.target)),s0=Number(digits(ed.s0))||0,m=$("mg");
+if(!n){$("fn").focus();return}if(!t){$("fa").focus();return}if(!ed.deadline){m.textContent="Elige para qué fecha necesitas el dinero.";return}
+if(!ed.start){m.textContent="Elige desde cuándo empiezas a ahorrar.";return}
+if(!ed.id&&ed.deadline<today()){m.textContent="Elige una fecha futura.";return}
+if(ed.deadline<ed.start){m.textContent="La fecha de la meta debe ser posterior a la fecha de inicio.";return}
+var au=null;if(ed.auto==="1"){var am=Number(digits(ed.aamt)),dy=parseInt(ed.aday,10);if(!am){$("fq").focus();m.textContent="Escribe el monto de cada aporte.";return}if(!ed.astart){m.textContent="Elige cuándo empieza el aporte automático.";return}au={on:1,amt:am,freq:ed.freq,day:dy>=1&&dy<=31?dy:1,start:ed.astart,acct:ed.aacct||"efectivo"}}
+var old=S.goals.find(function(x){return x.id===ed.id}),o={id:ed.id||rid("g"),name:n,emoji:ed.emoji.trim()||"🎯",target:t,deadline:ed.deadline,s0:s0,start:ed.start,color:old?old.color:PAL[S.goals.length%8],auto:au},i=S.goals.findIndex(function(x){return x.id===ed.id});
+if(i>=0)S.goals[i]=o;else S.goals.push(o);save();ed=null;tab="m";go()}
+function rmGoal(b){if(!sure(b))return;var id=ed.id;S.gc=S.gc.filter(function(p){return p.goal!==id});S.goals=S.goals.filter(function(g){return g.id!==id});save();ed=null;go()}
+function edAp(gid,kind){if(!S.goals.length)return;var g=S.goals.find(function(x){return x.id===gid})||S.goals[0],last=S.gc.filter(function(p){return p.goal===g.id}).pop();
+ed={k:"gc",goal:g.id,kind:kind||"a",acct:last&&S.accts.some(function(a){return a.id===last.acct})?last.acct:(g.auto?g.auto.acct:dAc()),amt:"",date:today(),note:""};go()}
+function edGc(id){var p=S.gc.find(function(x){return x.id===id});if(!p)return;ed={k:"gc",id:id,goal:p.goal,kind:p.kind,acct:p.acct,amt:dots(p.amt),date:p.date,note:p.note||""};go()}
+function fGc(){var r=ed.kind==="r",g=S.goals.find(function(x){return x.id===ed.goal})||S.goals[0],h="<h1>"+(ed.id?"Editar movimiento":r?"Retirar de una meta":"Aportar a una meta")+"</h1>"+amtBox("Monto (COP)",ed.amt);
+h+="<label>Meta</label><select id='fg' onchange=\"pick('goal',this.value)\">"+S.goals.map(function(x){return"<option value='"+x.id+"'"+(x.id===g.id?" selected":"")+">"+e(x.emoji)+" "+e(x.name)+"</option>"}).join("")+"</select>";
+if(g)h+="<p class='msg'>Llevas <b>"+M$(gsv(g,ed.id))+"</b> de "+M$(g.target)+" en esta meta.</p>";
+h+="<label>Tipo</label><select id='fk' onchange=\"pick('kind',this.value)\"><option value='a'"+(!r?" selected":"")+">Aporte (sumo dinero a la meta)</option><option value='r'"+(r?" selected":"")+">Retiro (saco dinero de la meta)</option></select>";
+h+="<label>"+(r?"¿A qué cuenta vuelve el dinero?":"¿De qué cuenta sale el dinero?")+"</label><select id='ff' onchange=\"pick('acct',this.value)\">"+ao(ed.acct)+"</select><p class='msg'>Saldo en "+e(acct(ed.acct))+": <b>"+M$(bal(ed.acct))+"</b></p>";
+h+="<label>Fecha</label><input type='date' id='fd' value='"+ed.date+"'><label>Nota (opcional)</label><input id='fo' maxlength='60' value=\""+e(ed.note)+"\" placeholder='Ej. Prima de junio'>";
+h+="<p class='msg'>"+(r?"El retiro baja lo ahorrado en la meta y devuelve el dinero a la cuenta elegida. No cuenta como ingreso.":"El aporte descuenta el dinero de la cuenta elegida y lo suma a la meta. No cuenta como gasto.")+"</p><p class='msg neg' id='mm'></p>";
+return h+bts("svGc",ed.id?"rmGc":"")}
+function svGc(){keep();var amt=Number(digits(ed.amt)),g=S.goals.find(function(x){return x.id===ed.goal});if(!g)return;if(!amt){$("fa").focus();return}if(!ed.date){$("fd").focus();return}
+if(ed.kind==="r"&&amt>gsv(g,ed.id)){$("mm").textContent="Esa meta solo tiene "+M$(Math.max(0,gsv(g,ed.id)))+" ahorrado.";return}
+var o={id:ed.id||rid("p"),goal:g.id,kind:ed.kind,acct:ed.acct||"efectivo",amt:amt,date:ed.date,note:(ed.note||"").trim()},i=S.gc.findIndex(function(p){return p.id===ed.id});
+if(i>=0)S.gc[i]=o;else S.gc.push(o);if(ed.pk)S.gl[ed.pk]="ok";save();ed=null;tab="m";go()}
+function rmGc(b){if(!sure(b))return;S.gc=S.gc.filter(function(p){return p.id!==ed.id});save();ed=null;go()}
+
 document.querySelectorAll("nav button").forEach(function(b){b.onclick=function(){tab=b.dataset.t;go()}});
 $("fab").onclick=function(){edTx()};
 render();
