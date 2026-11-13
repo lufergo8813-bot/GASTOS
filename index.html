@@ -430,5 +430,93 @@ $("fab").onclick=function(){edTx()};
 render();
 if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("service-worker.js").catch(function(){})})}
 </script>
+<script>
+/* ===== MEJORAS v2: cuotas por quincena + hitos financieros ===== */
+(function(){var st=document.createElement("style");st.textContent=
+"nav{gap:2px}nav button{font-size:10px;padding:7px 1px;letter-spacing:-.01em}"+
+".hi{display:flex;gap:12px;align-items:flex-start;padding:12px;margin-top:10px;border-radius:16px;border:1px solid var(--bd);border-left:5px solid var(--mu);background:var(--card)}"+
+".hi.ok{border-left-color:#10b981}"+
+".hi.late{border-color:#e11d48;background:color-mix(in srgb,#e11d48 10%,var(--card))}"+
+".hi.late .hd,.hi.late b{color:var(--bad)}"+
+".hi .grow small{margin-top:2px}"+
+".ck{width:32px;height:32px;flex:none;border-radius:10px;border:2px solid var(--mu);background:var(--card);color:#fff;font-size:18px;font-weight:800;display:grid;place-items:center;padding:0}"+
+".hi.ok .ck{background:#10b981;border-color:#10b981}"+
+".hi.late .ck{border-color:#e11d48}";
+document.head.appendChild(st)})();
+
+/* ---------- Gastos recurrentes: cuotas cada 15 días ---------- */
+FQ.d15="Cada 15 días contados desde la fecha de inicio";
+function ramt(r,d){if(r.mode!=="t")return r.amt;var i=Math.round(dbt(r.start,d)/15);return i>=r.n-1?r.total-r.amt*(r.n-1):r.amt}
+function rcu(r,d){return r.mode==="t"?" · cuota "+(Math.round(dbt(r.start,d)/15)+1)+" de "+r.n:""}
+function rend(r){return addD(r.start,15*(r.n-1))}
+function dues(r){var out=[],s=new Date(r.start+"T00:00:00"),t=new Date(today()+"T00:00:00"),d=new Date(s.getFullYear(),s.getMonth(),1);
+if(r.mode==="t"||r.freq==="d15"){var n=r.mode==="t"?(+r.n||1):1e4;for(var i=0;i<n;i++){var x=new Date(s.getFullYear(),s.getMonth(),s.getDate()+15*i);if(x>t)break;out.push(ds(x))}return out}
+while(d<=t){var y=d.getFullYear(),m=d.getMonth(),L=new Date(y,m+1,0).getDate(),ys=r.freq==="q"?[15,L]:r.freq==="q1"?[15]:r.freq==="q2"?[L]:[Math.min(r.day||1,L)];
+ys.forEach(function(x){var dt=new Date(y,m,x);if(dt>=s&&dt<=t)out.push(ds(dt))});d=new Date(y,m+1,1)}return out}
+function pend(){var L=[];S.rec.forEach(function(r){dues(r).forEach(function(d){var k=r.id+"|"+d;if(!S.rl[k])L.push({r:r,d:d,k:k})})});L.sort(function(a,b){return a.d<b.d?-1:1});
+var h="<button class='btn alt w' onclick=\"edMv('ingreso')\">💰 Registrar ingreso</button>";h+=gb();if(!L.length)return h;
+return h+"<h2>Por confirmar ("+L.length+")</h2><div class='card'>"+L.map(function(x){var c=cat(x.r.cat);return'<div class="row2"><span class="av" style="--c:'+c.color+'">'+c.emoji+'</span><span class="grow"><b>'+e(x.r.name)+"</b><small>"+fdt(x.d)+" · "+M$(ramt(x.r,x.d))+rcu(x.r,x.d)+'</small></span><button class="ib" aria-label="No se hizo" onclick="rc(\''+x.k+'\',0)">✕</button><button class="ib" aria-label="Sí se hizo" style="background:var(--ac);color:var(--on)" onclick="rc(\''+x.k+'\',1)">✓</button></div>'}).join("")+"</div><p class='msg'>¿Se hicieron estos pagos programados? ✓ los registra como gasto y ✕ los omite.</p>"}
+function rc(k,ok){var p=k.split("|"),r=S.rec.find(function(x){return x.id===p[0]});if(!r||S.rl[k])return;S.rl[k]=ok?"ok":"no";
+if(ok)S.tx.push({id:rid("t"),amt:ramt(r,p[1]),cat:r.cat,pay:r.pay,acct:r.pay==="cuenta"?r.acct:"",card:r.pay==="tarjeta"?r.card:"",date:p[1],note:r.name+(r.mode==="t"?" (cuota "+(Math.round(dbt(r.start,p[1])/15)+1)+" de "+r.n+")":" (recurrente)")});save();render()}
+function rsub(r){if(r.mode!=="t")return"<small>"+M$(r.amt)+" · "+(r.freq==="m"?"cada mes, día "+r.day:FQ[r.freq])+"</small>";
+var ok=0,no=0;dues(r).forEach(function(d){var v=S.rl[r.id+"|"+d];if(v==="ok")ok++;else if(v==="no")no++});
+return"<small>"+M$(r.total)+" en "+r.n+" cuotas de "+M$(r.amt)+" · cada 15 días</small><div class='bar' style='--c:#10b981'><i style='width:"+Math.round(ok*100/r.n)+"%'></i></div><small>"+(ok+no>=r.n?"✅ Completado":"Pagadas "+ok+" de "+r.n+" · termina el "+fdt(rend(r)))+"</small>"}
+function recList(){var h="<h2>Gastos recurrentes</h2>";h+=S.rec.length?"<div class='card'>"+S.rec.map(function(r){var c=cat(r.cat);return'<div class="row2"><span class="av" style="--c:'+c.color+'">'+c.emoji+'</span><span class="grow"><b>'+e(r.name)+"</b>"+rsub(r)+'</span><button class="ib" onclick="edRec(\''+r.id+'\')" aria-label="Editar">✎</button></div>'}).join("")+"</div>":"<p class='msg'>Programa pagos fijos (arriendo, servicios) o un gasto total que quieras pagar en cuotas por quincena. Cuando llegue la fecha, la app te pedirá confirmar en la pestaña Gastos si se hizo.</p>";return h+"<button class='btn alt w' onclick='edRec()'>+ Nuevo gasto recurrente</button>"}
+function edRec(id){var r=S.rec.find(function(x){return x.id===id}),t=r&&r.mode==="t";ed=r?{k:"rec",id:id,name:r.name,mode:t?"t":"s",n:t?String(r.n):"",amt:dots(t?r.total:r.amt),cat:r.cat,pay:r.pay,acct:r.acct||"",card:r.card||"",freq:r.freq||"q",day:String(r.day||1),start:r.start}:{k:"rec",name:"",mode:"s",n:"",amt:"",cat:S.cats[0]?S.cats[0].id:"",pay:"efectivo",acct:"",card:"",freq:"q",day:"1",start:today()};go()}
+function fRec(){var t=ed.mode==="t",h="<h1>"+(ed.id?"Editar recurrente":"Gasto recurrente")+"</h1><div class='card' style='padding:6px 14px 16px'><label>Nombre</label><input id='fn' maxlength='40' value=\""+e(ed.name)+"\" placeholder='Ej. Arriendo'><label>Tipo de gasto</label><select onchange=\"pick('mode',this.value)\"><option value='s'"+(!t?" selected":"")+">Recurrente (se repite, sin fecha fin)</option><option value='t'"+(t?" selected":"")+">Total dividido en quincenas (con fecha fin)</option></select></div>"+amtBox(t?"Valor total a pagar (COP)":"Monto de cada pago (COP)",ed.amt);
+if(t)h+="<label>¿En cuántas quincenas lo pagas?</label><input id='fnq' inputmode='numeric' maxlength='3' placeholder='Ej. 6' value='"+e(ed.n)+"'>";
+h+="<label>Categoría</label><select id='fcat'>"+S.cats.map(function(c){return"<option value='"+c.id+"'"+(c.id===ed.cat?" selected":"")+">"+c.emoji+" "+e(c.name)+"</option>"}).join("")+"</select>";
+h+="<label>Medio de pago</label><select onchange=\"pickRP(this.value)\"><option value='efectivo'"+(ed.pay==="efectivo"?" selected":"")+">💵 Efectivo</option>"+S.accts.filter(function(a){return a.id!=="efectivo"}).map(function(a){return"<option value='a:"+a.id+"'"+(ed.pay==="cuenta"&&ed.acct===a.id?" selected":"")+">🏦 "+e(a.name)+"</option>"}).join("")+"<option value='tarjeta'"+(ed.pay==="tarjeta"?" selected":"")+">💳 Tarjeta de crédito</option></select>";
+if(ed.pay==="tarjeta")h+=S.cards.length?"<label>¿Con cuál tarjeta?</label><select id='fcard'>"+S.cards.map(function(c){return"<option value='"+c.id+"'"+(c.id===ed.card?" selected":"")+">"+e(c.name)+"</option>"}).join("")+"</select>":"<p class='msg'>Primero agrega una tarjeta en Ajustes.</p>";
+if(!t){h+="<label>Frecuencia</label><select onchange=\"pick('freq',this.value)\">"+Object.keys(FQ).map(function(k){return"<option value='"+k+"'"+(k===ed.freq?" selected":"")+">"+FQ[k]+"</option>"}).join("")+"</select>";
+if(ed.freq==="m")h+="<label>Día del mes (1 a 31)</label><input id='fy' inputmode='numeric' maxlength='2' value='"+e(ed.day)+"'>"}
+h+="<label>"+(t?"Primer pago el":"Empieza el")+"</label><input type='date' id='fd' value='"+ed.start+"'>";
+h+=t?"<p class='msg' id='rp'></p><p class='msg'>Los pagos se cuentan de 15 en 15 días desde esa fecha (el primero es ese mismo día). En cada fecha la app te pregunta si lo pagaste, y al terminar las quincenas deja de preguntar.</p>":"<p class='msg'>Desde esa fecha, en cada fecha de pago la app te preguntará si se hizo. Si eliges una fecha pasada, te preguntará también por las anteriores.</p>";
+return h+bts("svRec",ed.id?"rmRec":"")}
+function rprev(){var p=$("rp");if(!p)return;var tot=Number(digits($("fa").value)),n=parseInt($("fnq")?$("fnq").value:"",10),s=$("fd").value;
+if(!tot||!(n>=1)||!s){p.textContent="Escribe el total y el número de quincenas para ver la cuota y la fecha final.";return}
+var b=Math.round(tot/n),l=tot-b*(n-1);p.innerHTML="Cuota por quincena: <b>"+M$(b)+"</b>"+(l!==b?" (la última queda en "+M$(l)+")":"")+"<br>Último pago: <b>"+fdt(addD(s,15*(n-1)))+"</b>"}
+function rwire(){["fa","fnq","fd"].forEach(function(i){var x=$(i);if(x)x.addEventListener("input",rprev)});rprev()}
+function svRec(){keep();var amt=Number(digits(ed.amt)),n=ed.name.trim(),t=ed.mode==="t",q=parseInt(ed.n,10);if(!n){$("fn").focus();return}if(!amt){$("fa").focus();return}if(t&&!(q>=1)){$("fnq").focus();return}if(!ed.start){$("fd").focus();return}
+var dy=parseInt(ed.day,10),o={id:ed.id||rid("r"),name:n,mode:t?"t":"s",amt:t?Math.round(amt/q):amt,cat:ed.cat,pay:ed.pay,acct:ed.pay==="cuenta"?ed.acct:"",card:ed.pay==="tarjeta"?ed.card:"",freq:ed.freq,day:dy>=1&&dy<=31?dy:1,start:ed.start},i=S.rec.findIndex(function(r){return r.id===ed.id});
+if(t){o.total=amt;o.n=q}if(i>=0)S.rec[i]=o;else S.rec.push(o);save();ed=null;go()}
+
+/* ---------- Hitos financieros ---------- */
+var o_norm=norm;norm=function(o){var s=o_norm(o);s.hitos=Array.isArray(o.hitos)?o.hitos:[];return s};
+var o_keep=keep;keep=function(){
+if(ed.k==="hito"){var g=function(i){var x=$(i);return x?x.value:""};ed.date=g("fd");ed.act=g("fn");ed.amt=g("fa");ed.res=g("fr");ed.flow=g("ff");ed.note=g("fo");ed.st=g("fk");return}
+o_keep();if(ed.k==="rec"&&$("fnq"))ed.n=$("fnq").value};
+var o_form=form;form=function(){return ed.k==="hito"?fHito():o_form()};
+function render(){document.querySelectorAll("nav button").forEach(function(b){b.className=b.dataset.t===tab?"on":""});
+$("fab").style.display=(!ed&&tab==="g")?"flex":"none";$("nav").style.display=ed?"none":"flex";
+$("app").innerHTML=ed?form():({g:vg,r:vr,c:vc,i:vi,m:vm,h:vh,a:va})[tab]();if(ed&&ed.k==="tx")dl();if(ed&&ed.k==="rec")rwire()}
+function hlate(h){return!h.done&&h.date<today()}
+function gb(){var p=gpend().length,late=S.goals.filter(function(g){return ginfo(g).late}).length,hl=S.hitos.filter(hlate).length,o="";
+if(p||late)o+="<button class='btn alt w' onclick=\"tab='m';go()\">🎯 "+(p?p+(p===1?" aporte de ahorro por confirmar":" aportes de ahorro por confirmar"):"")+(p&&late?" · ":"")+(late?late+(late===1?" meta atrasada":" metas atrasadas"):"")+"</button>";
+if(hl)o+="<button class='btn alt w' onclick=\"tab='h';go()\">🏁 "+hl+(hl===1?" hito financiero atrasado":" hitos financieros atrasados")+"</button>";return o}
+function hRow(x){var late=hlate(x),n=dbt(today(),x.date),cls=x.done?"ok":late?"late":"",
+s=x.done?"✅ Cumplido"+(x.doneDate?" el "+fdt(x.doneDate):""):late?"⚠️ Atrasado "+(-n)+(n===-1?" día":" días"):n===0?"Es hoy":"Faltan "+n+(n===1?" día":" días"),d=[];
+if(+x.amt>0)d.push("Monto: <b>"+M$(x.amt)+"</b>");if(+x.flow>0)d.push("Flujo de libertad: <b class='pos'>+"+M$(x.flow)+"/mes</b>");
+return'<div class="hi '+cls+'"><button class="ck" onclick="hck(\''+x.id+'\')" aria-pressed="'+(x.done?"true":"false")+'" aria-label="'+(x.done?"Marcar como no cumplido":"Marcar como cumplido")+'">'+(x.done?"✓":"")+'</button><span class="grow"><small class="hd">'+fdt(x.date)+" · "+s+"</small><b>"+e(x.act)+"</b>"+(d.length?"<small>"+d.join(" · ")+"</small>":"")+(x.res?"<small>🎯 Resultado esperado: "+e(x.res)+"</small>":"")+(x.note?"<small>📝 "+e(x.note)+"</small>":"")+'</span><button class="ib" onclick="edHito(\''+x.id+'\')" aria-label="Editar">✎</button></div>'}
+function vh(){var H=S.hitos,ok=H.filter(function(x){return x.done}).sort(function(a,b){return a.date<b.date?1:-1}),pe=H.filter(function(x){return!x.done}).sort(function(a,b){return a.date<b.date?-1:1}),lt=pe.filter(hlate).length,fl=0,ft=0;
+H.forEach(function(x){ft+=+x.flow||0;if(x.done)fl+=+x.flow||0});var pc=H.length?Math.round(ok.length*100/H.length):0;
+var h="<h1>Hitos financieros</h1><section class='hero'><span>Flujo de libertad mensual logrado</span><strong>"+M$(fl)+"</strong><small>"+(H.length?"de "+M$(ft)+" planeados · "+ok.length+" de "+H.length+" hitos cumplidos":"Arma tu cronograma: cada paso que te acerca a tu libertad financiera")+"</small>"+(H.length?"<div class='pb'><i style='width:"+pc+"%'></i></div>":"")+"</section><button class='btn w' onclick='edHito()'>+ Nuevo hito</button>";
+if(H.length)h+="<div class='kp'><div><b class='pos'>"+ok.length+"</b><small>cumplidos</small></div><div><b>"+(pe.length-lt)+"</b><small>por cumplir</small></div><div><b class='"+(lt?"neg":"")+"'>"+lt+"</b><small>atrasados</small></div></div>";
+else h+="<p class='msg'>Un hito es un paso importante de tu plan financiero: comprar un inmueble, pagar una deuda, abrir un negocio. Anota la fecha, qué vas a hacer, cuánto necesitas, qué esperas lograr y cuánto flujo mensual te generaría. Marca ✓ cuando lo cumplas; si pasa la fecha y no lo has hecho, la línea se pone roja.</p>";
+if(pe.length)h+="<h2>Por cumplir</h2>"+pe.map(hRow).join("");if(ok.length)h+="<h2>Cumplidos</h2>"+ok.map(hRow).join("");
+if(H.length)h+="<p class='msg'>El flujo de libertad mensual es el dinero que cada mes te llega gracias a ese hito (por ejemplo, el arriendo). Solo suma el de los hitos que marcas como cumplidos.</p>";return h}
+function hck(id){var x=S.hitos.find(function(h){return h.id===id});if(!x)return;x.done=!x.done;x.doneDate=x.done?today():"";save();render()}
+function edHito(id){var x=S.hitos.find(function(h){return h.id===id});ed=x?{k:"hito",id:id,date:x.date,act:x.act,amt:x.amt?dots(x.amt):"",res:x.res||"",flow:x.flow?dots(x.flow):"",note:x.note||"",st:x.done?"1":"0"}:{k:"hito",date:today(),act:"",amt:"",res:"",flow:"",note:"",st:"0"};go()}
+function fHito(){return"<h1>"+(ed.id?"Editar hito":"Nuevo hito")+"</h1><div class='card' style='padding:6px 14px 16px'><label>Fecha</label><input type='date' id='fd' value='"+ed.date+"'><label>Actividad</label><input id='fn' maxlength='80' value=\""+e(ed.act)+"\" placeholder='Ej. Pagar la cuota inicial del apartamento'><label>Monto (COP)</label><input id='fa' inputmode='numeric' placeholder='$ 0' value='"+ed.amt+"' oninput='this.value=dots(this.value)'><label>Resultado esperado</label><input id='fr' maxlength='80' value=\""+e(ed.res)+"\" placeholder='Ej. Tener 2 propiedades en arriendo'><label>Flujo de libertad mensual (COP)</label><input id='ff' inputmode='numeric' placeholder='$ 0' value='"+ed.flow+"' oninput='this.value=dots(this.value)'><label>Notas</label><textarea id='fo' maxlength='300' style='min-height:80px;font-size:15px'>"+e(ed.note)+"</textarea><label>Estado</label><select id='fk'><option value='0'"+(ed.st==="0"?" selected":"")+">Pendiente</option><option value='1'"+(ed.st==="1"?" selected":"")+">Cumplido</option></select></div><p class='msg'>El flujo de libertad mensual es el dinero que cada mes te seguiría llegando gracias a este hito, por ejemplo el arriendo de una propiedad.</p>"+bts("svHito",ed.id?"rmHito":"")}
+function svHito(){keep();var a=ed.act.trim();if(!ed.date){$("fd").focus();return}if(!a){$("fn").focus();return}
+var old=S.hitos.find(function(h){return h.id===ed.id}),dn=ed.st==="1",o={id:ed.id||rid("h"),date:ed.date,act:a,amt:Number(digits(ed.amt))||0,res:ed.res.trim(),flow:Number(digits(ed.flow))||0,note:ed.note.trim(),done:dn,doneDate:dn?(old&&old.done&&old.doneDate?old.doneDate:today()):""},i=S.hitos.findIndex(function(h){return h.id===ed.id});
+if(i>=0)S.hitos[i]=o;else S.hitos.push(o);save();ed=null;tab="h";go()}
+function rmHito(b){if(!sure(b))return;S.hitos=S.hitos.filter(function(h){return h.id!==ed.id});save();ed=null;go()}
+
+/* ---------- Arranque ---------- */
+S.hitos=Array.isArray(S.hitos)?S.hitos:[];
+(function(){var n=$("nav"),b=document.createElement("button");b.dataset.t="h";b.innerHTML="<span>🏁</span>Hitos";b.onclick=function(){tab="h";go()};n.insertBefore(b,n.lastElementChild)})();
+render();
+</script>
 </body>
 </html>
