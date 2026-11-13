@@ -486,7 +486,7 @@ var o_norm=norm;norm=function(o){var s=o_norm(o);s.hitos=Array.isArray(o.hitos)?
 var o_keep=keep;keep=function(){
 if(ed.k==="hito"){var g=function(i){var x=$(i);return x?x.value:""};ed.date=g("fd");ed.act=g("fn");ed.amt=g("fa");ed.res=g("fr");ed.flow=g("ff");ed.note=g("fo");ed.st=g("fk");return}
 o_keep();if(ed.k==="rec"&&$("fnq"))ed.n=$("fnq").value};
-var o_form=form;form=function(){return ed.k==="hito"?fHito():o_form()};
+var o_form=form;form=function(){return ed.k==="hbulk"?fHbulk():ed.k==="hito"?fHito():o_form()};
 function render(){document.querySelectorAll("nav button").forEach(function(b){b.className=b.dataset.t===tab?"on":""});
 $("fab").style.display=(!ed&&tab==="g")?"flex":"none";$("nav").style.display=ed?"none":"flex";
 $("app").innerHTML=ed?form():({g:vg,r:vr,c:vc,i:vi,m:vm,h:vh,a:va})[tab]();if(ed&&ed.k==="tx")dl();if(ed&&ed.k==="rec")rwire()}
@@ -500,7 +500,7 @@ if(+x.amt>0)d.push("Monto: <b>"+M$(x.amt)+"</b>");if(+x.flow>0)d.push("Flujo de 
 return'<div class="hi '+cls+'"><button class="ck" onclick="hck(\''+x.id+'\')" aria-pressed="'+(x.done?"true":"false")+'" aria-label="'+(x.done?"Marcar como no cumplido":"Marcar como cumplido")+'">'+(x.done?"✓":"")+'</button><span class="grow"><small class="hd">'+fdt(x.date)+" · "+s+"</small><b>"+e(x.act)+"</b>"+(d.length?"<small>"+d.join(" · ")+"</small>":"")+(x.res?"<small>🎯 Resultado esperado: "+e(x.res)+"</small>":"")+(x.note?"<small>📝 "+e(x.note)+"</small>":"")+'</span><button class="ib" onclick="edHito(\''+x.id+'\')" aria-label="Editar">✎</button></div>'}
 function vh(){var H=S.hitos,ok=H.filter(function(x){return x.done}).sort(function(a,b){return a.date<b.date?1:-1}),pe=H.filter(function(x){return!x.done}).sort(function(a,b){return a.date<b.date?-1:1}),lt=pe.filter(hlate).length,fl=0,ft=0;
 H.forEach(function(x){ft+=+x.flow||0;if(x.done)fl+=+x.flow||0});var pc=H.length?Math.round(ok.length*100/H.length):0;
-var h="<h1>Hitos financieros</h1><section class='hero'><span>Flujo de libertad mensual logrado</span><strong>"+M$(fl)+"</strong><small>"+(H.length?"de "+M$(ft)+" planeados · "+ok.length+" de "+H.length+" hitos cumplidos":"Arma tu cronograma: cada paso que te acerca a tu libertad financiera")+"</small>"+(H.length?"<div class='pb'><i style='width:"+pc+"%'></i></div>":"")+"</section><button class='btn w' onclick='edHito()'>+ Nuevo hito</button>";
+var h="<h1>Hitos financieros</h1><section class='hero'><span>Flujo de libertad mensual logrado</span><strong>"+M$(fl)+"</strong><small>"+(H.length?"de "+M$(ft)+" planeados · "+ok.length+" de "+H.length+" hitos cumplidos":"Arma tu cronograma: cada paso que te acerca a tu libertad financiera")+"</small>"+(H.length?"<div class='pb'><i style='width:"+pc+"%'></i></div>":"")+"</section><button class='btn w' onclick='edHito()'>+ Nuevo hito</button><button class='btn alt w' onclick='edBulk()'>📥 Subir hitos desde Excel</button>"+(hbMsg?"<p class='msg pos'>"+e(hbMsg)+"</p>":"");hbMsg="";
 if(H.length)h+="<div class='kp'><div><b class='pos'>"+ok.length+"</b><small>cumplidos</small></div><div><b>"+(pe.length-lt)+"</b><small>por cumplir</small></div><div><b class='"+(lt?"neg":"")+"'>"+lt+"</b><small>atrasados</small></div></div>";
 else h+="<p class='msg'>Un hito es un paso importante de tu plan financiero: comprar un inmueble, pagar una deuda, abrir un negocio. Anota la fecha, qué vas a hacer, cuánto necesitas, qué esperas lograr y cuánto flujo mensual te generaría. Marca ✓ cuando lo cumplas; si pasa la fecha y no lo has hecho, la línea se pone roja.</p>";
 if(pe.length)h+="<h2>Por cumplir</h2>"+pe.map(hRow).join("");if(ok.length)h+="<h2>Cumplidos</h2>"+ok.map(hRow).join("");
@@ -512,6 +512,70 @@ function svHito(){keep();var a=ed.act.trim();if(!ed.date){$("fd").focus();return
 var old=S.hitos.find(function(h){return h.id===ed.id}),dn=ed.st==="1",o={id:ed.id||rid("h"),date:ed.date,act:a,amt:Number(digits(ed.amt))||0,res:ed.res.trim(),flow:Number(digits(ed.flow))||0,note:ed.note.trim(),done:dn,doneDate:dn?(old&&old.done&&old.doneDate?old.doneDate:today()):""},i=S.hitos.findIndex(function(h){return h.id===ed.id});
 if(i>=0)S.hitos[i]=o;else S.hitos.push(o);save();ed=null;tab="h";go()}
 function rmHito(b){if(!sure(b))return;S.hitos=S.hitos.filter(function(h){return h.id!==ed.id});save();ed=null;go()}
+
+/* ---------- Subida masiva de hitos (Excel .xlsx, CSV o pegar desde Excel) ---------- */
+var hbMsg="",hbN=0;
+function nrm(s){return String(s==null?"":s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim()}
+function nD(y,m,d){y=+y;m=+m;d=+d;var t=new Date(y,m-1,d);return t.getFullYear()===y&&t.getMonth()===m-1&&t.getDate()===d&&y>=2000&&y<=2100?y+"-"+pad(m)+"-"+pad(d):""}
+function xDate(v){if(v==null||v==="")return"";var s=String(v).trim(),m;
+if(typeof v==="number"||/^\d{5}(\.\d+)?$/.test(s)){var n=Number(v);if(n>20000&&n<80000){var d=new Date(Math.round((n-25569)*864e5));return nD(d.getUTCFullYear(),d.getUTCMonth()+1,d.getUTCDate())}return""}
+if(m=s.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/))return nD(m[1],m[2],m[3]);
+if(m=s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2,4})/)){var y=+m[3];if(y<100)y+=2000;return nD(y,m[2],m[1])}
+return""}
+function xNum(v){if(typeof v==="number")return Math.max(0,Math.round(v));var s=String(v==null?"":v).replace(/[^\d.,-]/g,"");if(!s)return 0;
+if(/^\d{1,3}([.,]\d{3})+$/.test(s))s=s.replace(/[.,]/g,"");
+else if(s.indexOf(",")>-1&&s.indexOf(".")>-1)s=s.lastIndexOf(",")>s.lastIndexOf(".")?s.replace(/\./g,"").replace(",","."):s.replace(/,/g,"");
+else s=s.replace(",",".");
+var n=parseFloat(s);return isNaN(n)?0:Math.max(0,Math.round(n))}
+function csvRows(t){var first=t.split(/\r?\n/)[0]||"",dl=first.indexOf("\t")>-1?"\t":(first.split(";").length>=first.split(",").length?";":","),rows=[],row=[],f="",q=false;
+for(var i=0;i<t.length;i++){var c=t[i];if(q){if(c==='"'){if(t[i+1]==='"'){f+='"';i++}else q=false}else f+=c}
+else if(c==='"')q=true;else if(c===dl){row.push(f);f=""}
+else if(c==="\n"||c==="\r"){if(c==="\r"&&t[i+1]==="\n")i++;row.push(f);rows.push(row);row=[];f=""}else f+=c}
+if(f!==""||row.length){row.push(f);rows.push(row)}return rows}
+async function inflRaw(u8){var ds=new DecompressionStream("deflate-raw"),w=ds.writable.getWriter();w.write(u8);w.close();return new Uint8Array(await new Response(ds.readable).arrayBuffer())}
+async function unzipX(buf){var u=new Uint8Array(buf),dv=new DataView(buf),i=u.length-22,td=new TextDecoder(),files={};
+while(i>=0&&dv.getUint32(i,true)!==0x06054b50)i--;if(i<0)throw new Error("zip");
+var n=dv.getUint16(i+10,true),off=dv.getUint32(i+16,true);
+for(var k=0;k<n;k++){var meth=dv.getUint16(off+10,true),csz=dv.getUint32(off+20,true),nl=dv.getUint16(off+28,true),el=dv.getUint16(off+30,true),cl=dv.getUint16(off+32,true),lh=dv.getUint32(off+42,true),name=td.decode(u.subarray(off+46,off+46+nl));off+=46+nl+el+cl;
+if(!/^xl\/(sharedStrings\.xml|worksheets\/sheet\d+\.xml)$/.test(name))continue;
+var st=lh+30+dv.getUint16(lh+26,true)+dv.getUint16(lh+28,true),data=u.subarray(st,st+csz);files[name]=td.decode(meth===0?data:await inflRaw(data))}
+return files}
+function colIx(r){var m=(r.match(/^[A-Z]+/)||["A"])[0],n=0;for(var i=0;i<m.length;i++)n=n*26+m.charCodeAt(i)-64;return n-1}
+function xlsxRows(files){var P=new DOMParser(),ss=[],T=function(el){return Array.prototype.map.call(el.getElementsByTagName("t"),function(x){return x.textContent}).join("")};
+if(files["xl/sharedStrings.xml"])Array.prototype.forEach.call(P.parseFromString(files["xl/sharedStrings.xml"],"text/xml").getElementsByTagName("si"),function(si){ss.push(T(si))});
+var names=Object.keys(files).filter(function(k){return/worksheets\/sheet\d+\.xml$/.test(k)}).sort(function(a,b){return parseInt(a.match(/(\d+)\.xml/)[1])-parseInt(b.match(/(\d+)\.xml/)[1])}),best=null;
+for(var s=0;s<names.length;s++){var rows=[];Array.prototype.forEach.call(P.parseFromString(files[names[s]],"text/xml").getElementsByTagName("row"),function(rw,ri){var row=[];
+Array.prototype.forEach.call(rw.getElementsByTagName("c"),function(c){var t=c.getAttribute("t"),v=c.getElementsByTagName("v")[0],val="";
+if(t==="inlineStr")val=T(c);else if(v){val=v.textContent;if(t==="s")val=ss[+val]||"";else if(t==="n"||!t)val=Number(val)}
+row[colIx(c.getAttribute("r")||"A1")]=val});
+rows[(+rw.getAttribute("r")||ri+1)-1]=row});
+if(best===null)best=rows;if(hHead(rows)){return rows}}
+return best||[]}
+var HK=[["date",/fecha/],["act",/actividad|hito|accion/],["amt",/monto|valor/],["res",/resultado/],["flow",/flujo|libertad/],["note",/nota|observ/],["st",/cumpl|estado|hecho/]];
+function hHead(rows){for(var r=0;r<Math.min(rows.length,6);r++){var tmp={};Array.prototype.forEach.call(rows[r]||[],function(c,j){var s=nrm(c);HK.forEach(function(k){if(tmp[k[0]]==null&&k[1].test(s))tmp[k[0]]=j})});if(tmp.date!=null&&tmp.act!=null)return{r:r,ix:tmp}}return null}
+function hItems(rows){var hd=hHead(rows),ix=hd?hd.ix:{date:0,act:1,amt:2,res:3,flow:4,note:5,st:6},out=[];
+for(var r=hd?hd.r+1:0;r<rows.length;r++){var w=rows[r]||[];
+if(!Array.prototype.some.call(w,function(c){return String(c==null?"":c).trim()!==""}))continue;
+var g=function(k){var v=ix[k]==null?"":w[ix[k]];return v==null?"":v},d=xDate(g("date")),a=String(g("act")).trim();
+out.push({n:r+1,date:d,act:a,amt:xNum(g("amt")),res:String(g("res")).trim(),flow:xNum(g("flow")),note:String(g("note")).trim(),done:/^(si|s|x|1|true|cumplido|hecho|ok)$/.test(nrm(g("st"))),err:!d?"Fecha no válida (usa día/mes/año)":!a?"Falta la actividad":""})}
+return out}
+function edBulk(){ed={k:"hbulk",items:null,msg:""};go()}
+function hbShow(rows){var it=hItems(rows);if(!it.length){ed.msg="No encontré filas con datos. Revisa que tenga los títulos: Fecha, Actividad, Monto…";ed.items=null}else{ed.items=it;ed.msg=""}render()}
+async function hbFile(inp){var f=inp.files&&inp.files[0];if(!f)return;
+try{var rows;if(/\.xlsx$/i.test(f.name)){if(typeof DecompressionStream==="undefined")throw new Error("Este navegador no puede leer .xlsx. Pega las filas copiadas desde Excel.");rows=xlsxRows(await unzipX(await f.arrayBuffer()))}
+else if(/\.xls$/i.test(f.name))throw new Error("Los .xls antiguos no se pueden leer. Guárdalo como .xlsx o CSV.");
+else{var b=await f.arrayBuffer(),t;try{t=new TextDecoder("utf-8",{fatal:true}).decode(b)}catch(x){t=new TextDecoder("windows-1252").decode(b)}rows=csvRows(t.replace(/^\uFEFF/,""))}
+hbShow(rows)}catch(x){ed.msg=x&&x.message&&x.message.length<110?x.message:"No pude leer ese archivo. Usa .xlsx o CSV, o pega las filas copiadas desde Excel.";render()}}
+function hbPaste(){var t=$("hp").value;if(!t.trim()){ed.msg="Primero pega las filas.";render();return}hbShow(csvRows(t))}
+function fHbulk(){var h="<h1>Subir hitos desde Excel</h1>";
+if(!ed.items){h+="<div class='card' style='padding:6px 14px 16px'><label>Archivo de Excel (.xlsx) o CSV</label><input type='file' id='hf' accept='.xlsx,.csv,.tsv,.txt' onchange='hbFile(this)'><label>…o pega aquí las filas copiadas desde Excel</label><textarea id='hp' placeholder='Selecciona las celdas en Excel, copia y pega aquí' style='min-height:90px;font-size:13px'></textarea><button class='btn alt w' onclick='hbPaste()'>Revisar lo pegado</button></div>"+(ed.msg?"<p class='msg neg'>"+e(ed.msg)+"</p>":"")+"<p class='msg'>Columnas: <b>Fecha, Actividad, Monto, Resultado esperado, Flujo de libertad mensual, Notas, Cumplido (Sí/No)</b>. Pueden venir con esos títulos en la primera fila o en ese orden. Las fechas van día/mes/año (ej. 15/03/2027). Si ya tienes un hito con la misma fecha y actividad, se omite, así no se duplica nada.</p><div class='btns'><button class='btn alt' onclick='cancel()'>Cancelar</button></div>";return h}
+var it=ed.items,ok=it.filter(function(x){return!x.err}).length,bad=it.length-ok;
+h+="<p class='msg'>Encontré <b>"+it.length+"</b> filas: <b class='pos'>"+ok+" listas</b>"+(bad?" y <b class='neg'>"+bad+" con error</b> (esas no se importan)":"")+". Revisa y confirma.</p><div class='card'>"+it.slice(0,60).map(function(x){return"<div class='row2'><span class='av sm' style='--c:"+(x.err?"#e11d48":"#10b981")+"'>"+(x.err?"✕":"✓")+"</span><span class='grow'><b>"+e(x.act||"(sin actividad)")+"</b><small>"+(x.err?"Fila "+x.n+": "+x.err:fdt(x.date)+(x.amt?" · "+M$(x.amt):"")+(x.flow?" · +"+M$(x.flow)+"/mes":"")+(x.done?" · cumplido":""))+"</small></span></div>"}).join("")+"</div>"+(it.length>60?"<p class='msg'>…y "+(it.length-60)+" filas más.</p>":"");
+return h+"<div class='btns'><button class='btn alt' onclick='ed.items=null;render()'>Otro archivo</button>"+(ok?"<button class='btn' onclick='hbImport()'>Importar "+ok+"</button>":"")+"</div>"}
+function hbImport(){var ex={},ok=0,dup=0;S.hitos.forEach(function(h){ex[h.date+"|"+nrm(h.act)]=1});
+ed.items.forEach(function(x){if(x.err)return;var k=x.date+"|"+nrm(x.act);if(ex[k]){dup++;return}ex[k]=1;
+S.hitos.push({id:"h"+Date.now()+"_"+(hbN++),date:x.date,act:x.act,amt:x.amt,res:x.res,flow:x.flow,note:x.note,done:x.done,doneDate:x.done?today():""});ok++});
+save();hbMsg="Se importaron "+ok+(ok===1?" hito":" hitos")+(dup?" · "+dup+(dup===1?" omitido por estar repetido":" omitidos por estar repetidos"):"")+".";ed=null;tab="h";go()}
 
 /* ---------- Arranque ---------- */
 S.hitos=Array.isArray(S.hitos)?S.hitos:[];
