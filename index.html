@@ -489,7 +489,7 @@ o_keep();if(ed.k==="rec"&&$("fnq"))ed.n=$("fnq").value};
 var o_form=form;form=function(){return ed.k==="hbulk"?fHbulk():ed.k==="hito"?fHito():o_form()};
 function render(){document.querySelectorAll("nav button").forEach(function(b){b.className=b.dataset.t===tab?"on":""});
 $("fab").style.display=(!ed&&tab==="g")?"flex":"none";$("nav").style.display=ed?"none":"flex";
-$("app").innerHTML=ed?form():({g:vg,r:vr,c:vc,i:vi,m:vm,h:vh,a:va})[tab]();if(ed&&ed.k==="tx")dl();if(ed&&ed.k==="rec")rwire()}
+$("app").innerHTML=ed?form():({g:vg,r:vr,c:vc,i:vi,m:vm,h:vh,p:vp,a:va})[tab]();if(ed&&ed.k==="tx")dl();if(ed&&ed.k==="rec")rwire()}
 function hlate(h){return!h.done&&h.date<today()}
 function gb(){var p=gpend().length,late=S.goals.filter(function(g){return ginfo(g).late}).length,hl=S.hitos.filter(hlate).length,o="";
 if(p||late)o+="<button class='btn alt w' onclick=\"tab='m';go()\">🎯 "+(p?p+(p===1?" aporte de ahorro por confirmar":" aportes de ahorro por confirmar"):"")+(p&&late?" · ":"")+(late?late+(late===1?" meta atrasada":" metas atrasadas"):"")+"</button>";
@@ -576,6 +576,154 @@ function hbImport(){var ex={},ok=0,dup=0;S.hitos.forEach(function(h){ex[h.date+"
 ed.items.forEach(function(x){if(x.err)return;var k=x.date+"|"+nrm(x.act);if(ex[k]){dup++;return}ex[k]=1;
 S.hitos.push({id:"h"+Date.now()+"_"+(hbN++),date:x.date,act:x.act,amt:x.amt,res:x.res,flow:x.flow,note:x.note,done:x.done,doneDate:x.done?today():""});ok++});
 save();hbMsg="Se importaron "+ok+(ok===1?" hito":" hitos")+(dup?" · "+dup+(dup===1?" omitido por estar repetido":" omitidos por estar repetidos"):"")+".";ed=null;tab="h";go()}
+
+/* ---------- Generador de Excel (.xlsx) sin librerías ---------- */
+var CRCT=null;
+function crc32(u){if(!CRCT){CRCT=[];for(var n=0;n<256;n++){var c=n;for(var k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;CRCT[n]=c>>>0}}var c=0xFFFFFFFF;for(var i=0;i<u.length;i++)c=CRCT[(c^u[i])&255]^(c>>>8);return(c^0xFFFFFFFF)>>>0}
+function zipStore(files){var te=new TextEncoder(),parts=[],cd=[],off=0;
+files.forEach(function(f){var nm=te.encode(f[0]),d=te.encode(f[1]),crc=crc32(d),lh=new DataView(new ArrayBuffer(30));
+lh.setUint32(0,0x04034b50,true);lh.setUint16(4,20,true);lh.setUint16(6,0x0800,true);lh.setUint16(12,0x21,true);lh.setUint32(14,crc,true);lh.setUint32(18,d.length,true);lh.setUint32(22,d.length,true);lh.setUint16(26,nm.length,true);
+parts.push(new Uint8Array(lh.buffer),nm,d);
+var ch=new DataView(new ArrayBuffer(46));ch.setUint32(0,0x02014b50,true);ch.setUint16(4,20,true);ch.setUint16(6,20,true);ch.setUint16(8,0x0800,true);ch.setUint16(14,0x21,true);ch.setUint32(16,crc,true);ch.setUint32(20,d.length,true);ch.setUint32(24,d.length,true);ch.setUint16(28,nm.length,true);ch.setUint32(42,off,true);
+cd.push(new Uint8Array(ch.buffer),nm);off+=30+nm.length+d.length});
+var cs=0;cd.forEach(function(x){cs+=x.length});var en=new DataView(new ArrayBuffer(22));en.setUint32(0,0x06054b50,true);en.setUint16(8,files.length,true);en.setUint16(10,files.length,true);en.setUint32(12,cs,true);en.setUint32(16,off,true);
+return new Blob(parts.concat(cd,[new Uint8Array(en.buffer)]),{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"})}
+function xe(s){return String(s==null?"":s).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")}
+function cl(i){var s="";i++;while(i>0){var m=(i-1)%26;s=String.fromCharCode(65+m)+s;i=Math.floor((i-1)/26)}return s}
+function cS(v,s){return{k:"s",v:String(v==null?"":v),s:s||0}}
+function cN(v,s){return{k:"n",v:+v||0,s:s||0}}
+function cF(f,v,s){return{k:typeof v==="string"?"fs":"fn",f:f,v:typeof v==="string"?v:(+v||0),s:s||0}}
+function dser(iso){var p=String(iso).split("-");return Math.round((Date.UTC(+p[0],+p[1]-1,+p[2])-Date.UTC(1899,11,30))/864e5)}
+function sheetXml(rows,w){var x='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/>'+(w?"<cols>"+w.map(function(n,i){return'<col min="'+(i+1)+'" max="'+(i+1)+'" width="'+n+'" customWidth="1"/>'}).join("")+"</cols>":"")+"<sheetData>";
+rows.forEach(function(r,ri){x+='<row r="'+(ri+1)+'">';r.forEach(function(c,ci){if(!c)return;var ref=cl(ci)+(ri+1),st=c.s?' s="'+c.s+'"':"";
+if(c.k==="s"){if(c.v==="")return;x+='<c r="'+ref+'"'+st+' t="inlineStr"><is><t xml:space="preserve">'+xe(c.v)+"</t></is></c>"}
+else if(c.k==="n")x+='<c r="'+ref+'"'+st+"><v>"+c.v+"</v></c>";
+else if(c.k==="fn")x+='<c r="'+ref+'"'+st+"><f>"+xe(c.f)+"</f><v>"+c.v+"</v></c>";
+else x+='<c r="'+ref+'"'+st+' t="str"><f>'+xe(c.f)+"</f><v>"+xe(c.v)+"</v></c>"});x+="</row>"});
+return x+"</sheetData></worksheet>"}
+var STY='<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="&quot;$&quot;\\ #,##0"/></numFmts><fonts count="3"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF4F46E5"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="6"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/><xf numFmtId="14" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="164" fontId="2" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+function wbBuild(sh){var R="http://schemas.openxmlformats.org/officeDocument/2006/relationships",H='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+files=[["[Content_Types].xml",H+'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'+sh.map(function(s,i){return'<Override PartName="/xl/worksheets/sheet'+(i+1)+'.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'}).join("")+"</Types>"],
+["_rels/.rels",H+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="'+R+'/officeDocument" Target="xl/workbook.xml"/></Relationships>'],
+["xl/workbook.xml",H+'<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="'+R+'"><sheets>'+sh.map(function(s,i){return'<sheet name="'+xe(s.n)+'" sheetId="'+(i+1)+'" r:id="rId'+(i+1)+'"/>'}).join("")+'</sheets><calcPr calcId="191029" fullCalcOnLoad="1"/></workbook>'],
+["xl/_rels/workbook.xml.rels",H+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+sh.map(function(s,i){return'<Relationship Id="rId'+(i+1)+'" Type="'+R+'/worksheet" Target="worksheets/sheet'+(i+1)+'.xml"/>'}).join("")+'<Relationship Id="rId'+(sh.length+1)+'" Type="'+R+'/styles" Target="styles.xml"/></Relationships>'],
+["xl/styles.xml",H+STY]];
+sh.forEach(function(s,i){files.push(["xl/worksheets/sheet"+(i+1)+".xml",sheetXml(s.rows,s.w)])});return zipStore(files)}
+function tbl(n,cols,rows,w){var out=[cols.map(function(c){return cS(c[0],1)})];
+rows.forEach(function(r){out.push(cols.map(function(c,i){var v=r[i];if(c[1]==="d")return v?cN(dser(v),2):null;if(c[1]==="m")return cN(v,3);if(c[1]==="n")return cN(v,0);return cS(v)}))});
+return{n:n,rows:out,w:w}}
+function xDown(b,nm){var a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=nm;document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},4000)}
+function xFall(b,nm,sub,body,mid){xDown(b,nm);var m=$(mid);if(m)m.textContent="Se descargó "+nm+". Adjúntalo al correo que se abre ahora.";location.href="mailto:?subject="+encodeURIComponent(sub)+"&body="+encodeURIComponent(body+"\n\nAdjunta el archivo "+nm+", que se acaba de descargar.")}
+function xSend(b,nm,sub,body,mid){var f=null;try{f=new File([b],nm,{type:b.type})}catch(x){}
+if(f&&navigator.canShare&&navigator.canShare({files:[f]})){navigator.share({files:[f],title:sub,text:body}).then(function(){var m=$(mid);if(m)m.textContent="Listo: elige tu correo en el menú y el Excel ya va adjunto."}).catch(function(x){if(!x||x.name!=="AbortError")xFall(b,nm,sub,body,mid)});return}
+xFall(b,nm,sub,body,mid)}
+
+/* ---------- Préstamos a otras personas ---------- */
+var lpf="";
+function lid(p){return p+Date.now()+"_"+(hbN++)}
+var o_norm3=norm;norm=function(o){var s=o_norm3(o);s.loans=Array.isArray(o.loans)?o.loans:[];s.lp=Array.isArray(o.lp)?o.lp:[];return s};
+S.loans=Array.isArray(S.loans)?S.loans:[];S.lp=Array.isArray(S.lp)?S.lp:[];
+var o_bal=bal;bal=function(id){var b=o_bal(id);S.loans.forEach(function(l){if(l.acct===id)b-=l.amt});S.lp.forEach(function(p){if(p.acct===id)b+=p.amt});return b};
+var o_rmAc=rmAc;rmAc=function(b){if(S.loans.some(function(l){return l.acct===ed.id})||S.lp.some(function(p){return p.acct===ed.id})){$("ma").textContent="No se puede eliminar: tiene préstamos o abonos. Puedes cambiarle el nombre.";return}o_rmAc(b)};
+var o_keep3=keep;keep=function(){var g=function(i){var x=$(i);return x?x.value:""};
+if(ed.k==="loan"){ed.person=g("fn");ed.amt=g("fa");ed.acct=g("ff");ed.date=g("fd");ed.due=g("fv");ed.note=g("fo");return}
+if(ed.k==="lp"){ed.amt=g("fa");ed.loan=g("fg");ed.acct=g("ff");ed.date=g("fd");ed.note=g("fo");return}
+o_keep3()};
+var o_form3=form;form=function(){return ed.k==="loan"?fLoan():ed.k==="lp"?fLp():o_form3()};
+var o_vc=vc;vc=function(){var h=o_vc(),T=lpTotals(S.loans);return h.replace("</section>",function(){return"</section><button class='btn alt w' onclick=\"tab='p';go()\">🤝 Préstamos a otras personas"+(S.loans.length?" · te deben "+M$(Math.max(0,T.owed)):"")+"</button>"})};
+function lcalc(l){var pd=0;S.lp.forEach(function(p){if(p.loan===l.id)pd+=p.amt});var sal=l.amt-pd;return{pd:pd,sal:sal,done:sal<=0,late:sal>0&&!!l.due&&l.due<today()}}
+function lpeople(){var k={},o=[];S.loans.forEach(function(l){var p=l.person.trim(),q=p.toLowerCase();if(!k[q]){k[q]=1;o.push(p)}});return o.sort(function(a,b){return a.localeCompare(b,"es")})}
+function lpMatch(l){return!lpf||l.person.trim().toLowerCase()===lpf.toLowerCase()}
+function lpFilter(v){lpf=v;render()}
+function lpTotals(L){var pr=0,pd=0;L.forEach(function(l){pr+=l.amt;pd+=lcalc(l).pd});return{pr:pr,pd:pd,owed:pr-pd}}
+function lcard(l){var c=lcalc(l),pct=l.amt?Math.min(100,Math.round(c.pd*100/l.amt)):0,dl=l.due?dbt(l.due,today()):0;
+var h='<div class="card ic" style="margin-top:12px"><div class="sr"><span class="av" style="--c:#0ea5e9">🤝</span><span class="grow"><b>'+e(l.person)+'</b><small>Prestado el '+fdt(l.date)+(l.due?" · pagar el "+fdt(l.due):"")+" · desde "+e(acct(l.acct))+'</small></span><button class="ib" onclick="edLoan(\''+l.id+'\')" aria-label="Editar">✎</button></div>';
+h+='<div class="kp"><div><b>'+M$(l.amt)+'</b><small>prestado</small></div><div><b class="pos">'+M$(c.pd)+'</b><small>abonado</small></div><div><b>'+M$(Math.max(0,c.sal))+'</b><small>saldo</small></div></div><div class="bar" style="--c:'+(c.late?"#e11d48":"#10b981")+'"><i style="width:'+pct+'%"></i></div>';
+h+=c.done?'<span class="bd ok">✅ Pagado</span>':c.late?'<span class="bd no">⚠️ Vencido hace '+dl+(dl===1?" día":" días")+"</span>":'<span class="bd ok">'+(l.due?(dl===0?"Vence hoy":"Faltan "+(-dl)+(dl===-1?" día":" días")+" para la fecha pactada"):"Pendiente, sin fecha pactada")+"</span>";
+if(l.note)h+="<br><small>📝 "+e(l.note)+"</small>";
+if(!c.done)h+='<button class="btn alt w" onclick="edLp(\'\',\''+l.id+'\')">💰 Registrar abono</button>';
+return h+"</div>"}
+function lmov(L){var ids={},M=[];L.forEach(function(l){ids[l.id]=l;M.push({k:"l",d:l.date,id:l.id,l:l,a:l.amt})});S.lp.forEach(function(p){if(ids[p.loan])M.push({k:"p",d:p.date,id:p.id,l:ids[p.loan],a:p.amt,n:p.note,c:p.acct})});
+M.sort(function(a,b){return a.d<b.d?1:a.d>b.d?-1:(a.id<b.id?1:-1)});return M}
+function vp(){var ppl=lpeople();if(lpf&&!ppl.some(function(p){return p.toLowerCase()===lpf.toLowerCase()}))lpf="";
+var L=S.loans.filter(lpMatch),T=lpTotals(L),act=L.filter(function(l){return!lcalc(l).done}).sort(function(a,b){return(a.due||"9999")<(b.due||"9999")?-1:1}),dn=L.filter(function(l){return lcalc(l).done}).sort(function(a,b){return a.date<b.date?1:-1}),nm=ppl.filter(function(p){return p.toLowerCase()===lpf.toLowerCase()})[0]||"";
+var h="<button class='btn alt' onclick=\"tab='c';go()\">‹ Cuentas</button><h1 style='margin-top:12px'>Préstamos</h1><section class='hero'><span>"+(lpf?"Te debe "+e(nm):"Te deben")+"</span><strong>"+M$(Math.max(0,T.owed))+"</strong><small>"+(L.length?"Prestaste "+M$(T.pr)+" · te han pagado "+M$(T.pd):"Aún no has registrado préstamos")+"</small></section>";
+if(ppl.length>1)h+="<label>Ver a</label><select onchange='lpFilter(this.value)'><option value=''>Todas las personas</option>"+ppl.map(function(p){return"<option value=\""+e(p)+"\""+(p.toLowerCase()===lpf.toLowerCase()?" selected":"")+">"+e(p)+"</option>"}).join("")+"</select>";
+h+="<button class='btn w' onclick='edLoan()'>+ Nuevo préstamo</button><div class='btns'><button class='btn alt' onclick=\"lpX('d')\">⬇️ Descargar Excel</button><button class='btn alt' onclick=\"lpX('s')\">✉️ Enviar por correo</button></div><p class='msg' id='lpm'></p>";
+if(!S.loans.length)return h+"<p class='msg'>Aquí registras el dinero que le prestas a otras personas. Anotas a quién, cuánto, cuándo y de qué cuenta sale; después registras cada abono que te hagan y la app te dice cuánto te deben. Todo se puede bajar a Excel o enviar por correo.</p>";
+if(act.length)h+="<h2>Por cobrar</h2>"+act.map(lcard).join("");if(dn.length)h+="<h2>Pagados</h2>"+dn.map(lcard).join("");
+var M=lmov(L);h+="<h2>Movimientos ("+M.length+")</h2><div class='card'>"+M.slice(0,40).map(function(m){var pr=m.k==="l";return'<button class="row" onclick="'+(pr?"edLoan":"edLp")+"('"+m.id+"')\"><span class=\"av\" style=\"--c:"+(pr?"#e11d48":"#10b981")+'">'+(pr?"⬆️":"⬇️")+'</span><span class="grow"><b>'+(pr?"Préstamo a ":"Abono de ")+e(m.l.person)+"</b><small>"+fdt(m.d)+" · "+e(acct(pr?m.l.acct:m.c))+((pr?m.l.note:m.n)?" · "+e(pr?m.l.note:m.n):"")+'</small></span><b class="amt '+(pr?"neg":"pos")+'">'+(pr?"−":"+")+M$(m.a)+"</b></button>"}).join("")+"</div>"+(M.length>40?"<p class='msg'>Se muestran los 40 más recientes. El Excel trae todos.</p>":"");
+return h+"<p class='msg'>Los préstamos bajan el dinero de la cuenta de donde salen, pero no cuentan como gasto. Cada abono lo devuelve a la cuenta que elijas.</p>"}
+function edLoan(id){var l=S.loans.find(function(x){return x.id===id}),last=S.loans[S.loans.length-1];
+ed=l?{k:"loan",id:id,person:l.person,amt:dots(l.amt),acct:l.acct,date:l.date,due:l.due||"",note:l.note||""}:{k:"loan",person:lpf&&lpeople().filter(function(p){return p.toLowerCase()===lpf.toLowerCase()})[0]||"",amt:"",acct:last&&S.accts.some(function(a){return a.id===last.acct})?last.acct:dAc(),date:today(),due:"",note:""};go()}
+function fLoan(){var h="<h1>"+(ed.id?"Editar préstamo":"Nuevo préstamo")+"</h1><div class='card' style='padding:6px 14px 16px'><label>¿A quién le prestas?</label><input id='fn' list='lpl' maxlength='40' placeholder='Ej. Ana Gómez' value=\""+e(ed.person)+"\"><datalist id='lpl'>"+lpeople().map(function(p){return"<option value=\""+e(p)+"\">"}).join("")+"</datalist></div>"+amtBox("Monto prestado (COP)",ed.amt);
+h+="<label>Sale de la cuenta</label><select id='ff' onchange=\"pick('acct',this.value)\">"+ao(ed.acct)+"</select><p class='msg'>Saldo en "+e(acct(ed.acct))+": <b>"+M$(bal(ed.acct))+"</b></p>";
+h+="<label>Fecha del préstamo</label><input type='date' id='fd' value='"+ed.date+"'><label>¿Para cuándo te lo devolverá? (opcional)</label><input type='date' id='fv' value='"+ed.due+"'><label>Nota (opcional)</label><input id='fo' maxlength='80' value=\""+e(ed.note)+"\" placeholder='Ej. Para el arriendo'>";
+h+="<p class='msg'>El préstamo baja el dinero de la cuenta elegida, pero no cuenta como gasto. Cuando te paguen, registra un abono y el dinero vuelve a la cuenta que elijas.</p><p class='msg neg' id='ml'></p>";return h+bts("svLoan",ed.id?"rmLoan":"")}
+function svLoan(){keep();var amt=Number(digits(ed.amt)),n=ed.person.trim(),m=$("ml");if(!n){$("fn").focus();return}if(!amt){$("fa").focus();return}if(!ed.date){$("fd").focus();return}
+if(ed.due&&ed.due<ed.date){m.textContent="La fecha de devolución no puede ser anterior a la del préstamo.";return}
+var old=S.loans.find(function(x){return x.id===ed.id});if(old&&amt<lcalc(old).pd){m.textContent="Ya te han abonado "+M$(lcalc(old).pd)+", el monto no puede ser menor.";return}
+var o={id:ed.id||lid("l"),person:n,amt:amt,date:ed.date,due:ed.due||"",acct:ed.acct||"efectivo",note:(ed.note||"").trim()},i=S.loans.findIndex(function(x){return x.id===ed.id});if(i>=0)S.loans[i]=o;else S.loans.push(o);save();ed=null;tab="p";go()}
+function rmLoan(b){if(!sure(b))return;var id=ed.id;S.lp=S.lp.filter(function(p){return p.loan!==id});S.loans=S.loans.filter(function(l){return l.id!==id});save();ed=null;tab="p";go()}
+function edLp(id,loan){var p=S.lp.find(function(x){return x.id===id}),l=S.loans.find(function(x){return x.id===(p?p.loan:loan)});
+ed=p?{k:"lp",id:id,loan:p.loan,amt:dots(p.amt),date:p.date,acct:p.acct,note:p.note||""}:{k:"lp",loan:loan,amt:"",date:today(),acct:l&&S.accts.some(function(a){return a.id===l.acct})?l.acct:dAc(),note:""};go()}
+function lpOwn(){var own=0;if(ed.id){var p0=S.lp.find(function(x){return x.id===ed.id});if(p0&&p0.loan===ed.loan)own=p0.amt}return own}
+function fLp(){var ls=S.loans.filter(function(l){return l.id===ed.loan||!lcalc(l).done}),l=S.loans.find(function(x){return x.id===ed.loan})||ls[0];if(l)ed.loan=l.id;
+var h="<h1>"+(ed.id?"Editar abono":"Registrar abono")+"</h1>"+amtBox("Monto del abono (COP)",ed.amt)+"<label>¿Quién te paga?</label><select id='fg' onchange=\"pick('loan',this.value)\">"+ls.map(function(x){return"<option value='"+x.id+"'"+(l&&x.id===l.id?" selected":"")+">"+e(x.person)+" · "+fdt(x.date)+" · saldo "+M$(lcalc(x).sal)+"</option>"}).join("")+"</select><p class='msg'>Saldo pendiente: <b>"+M$(l?lcalc(l).sal+lpOwn():0)+"</b></p>";
+h+="<label>Entra a la cuenta</label><select id='ff'>"+ao(ed.acct)+"</select><label>Fecha</label><input type='date' id='fd' value='"+ed.date+"'><label>Nota (opcional)</label><input id='fo' maxlength='80' value=\""+e(ed.note)+"\" placeholder='Ej. Transferencia Nequi'>";
+return h+"<p class='msg'>El abono suma el dinero a la cuenta elegida y baja lo que te deben. No cuenta como ingreso.</p><p class='msg neg' id='ml'></p>"+bts("svLp",ed.id?"rmLp":"")}
+function svLp(){keep();var amt=Number(digits(ed.amt)),l=S.loans.find(function(x){return x.id===ed.loan}),m=$("ml");if(!l)return;if(!amt){$("fa").focus();return}if(!ed.date){$("fd").focus();return}
+var sal=lcalc(l).sal+lpOwn();if(amt>sal){m.textContent="Ese préstamo solo tiene un saldo de "+M$(sal)+".";return}
+if(ed.date<l.date){m.textContent="El abono no puede ser anterior a la fecha del préstamo ("+fdt(l.date)+").";return}
+var o={id:ed.id||lid("q"),loan:l.id,amt:amt,date:ed.date,acct:ed.acct||"efectivo",note:(ed.note||"").trim()},i=S.lp.findIndex(function(x){return x.id===ed.id});if(i>=0)S.lp[i]=o;else S.lp.push(o);save();ed=null;tab="p";go()}
+function rmLp(b){if(!sure(b))return;S.lp=S.lp.filter(function(p){return p.id!==ed.id});save();ed=null;tab="p";go()}
+
+/* ---------- Excel de préstamos y respaldo en Excel ---------- */
+var ASC=function(a,b){return a.date<b.date?-1:a.date>b.date?1:0};
+function lsheets(){var L=S.loans.slice().sort(function(a,b){return a.date<b.date?-1:a.date>b.date?1:(a.id<b.id?-1:1)}),num={},M=[],hd=function(a){return a.map(function(h){return cS(h,1)})};
+L.forEach(function(l,i){num[l.id]=i+1;M.push({d:l.date,t:"Préstamo",p:l.person.trim(),a:l.amt,c:acct(l.acct),n:l.note,r:i+1})});
+S.lp.forEach(function(p){var l=S.loans.find(function(x){return x.id===p.loan});if(l)M.push({d:p.date,t:"Abono",p:l.person.trim(),a:p.amt,c:acct(p.acct),n:p.note,r:num[l.id]})});
+M.sort(function(a,b){return a.d<b.d?-1:a.d>b.d?1:((a.t==="Préstamo"?0:1)-(b.t==="Préstamo"?0:1))});
+var mn=Math.max(M.length,1)+1,rg=function(c){return"Movimientos!$"+c+"$2:$"+c+"$"+mn},mr=[hd(["Fecha","Tipo","Persona","Monto","Cuenta","Nota","N° préstamo"])];
+M.forEach(function(m){mr.push([cN(dser(m.d),2),cS(m.t),cS(m.p),cN(m.a,3),cS(m.c),cS(m.n),cN(m.r)])});
+var lr=[hd(["N°","Persona","Fecha del préstamo","Monto prestado","Fecha pactada de pago","Abonado","Saldo","Estado","Cuenta de salida","Nota"])],tp=0,ta=0;
+L.forEach(function(l,i){var r=i+2,c=lcalc(l);tp+=l.amt;ta+=c.pd;
+lr.push([cN(i+1),cS(l.person.trim()),cN(dser(l.date),2),cN(l.amt,3),l.due?cN(dser(l.due),2):null,cF("SUMIFS("+rg("D")+","+rg("B")+',"Abono",'+rg("G")+",A"+r+")",c.pd,3),cF("D"+r+"-F"+r,c.sal,3),cF('IF(G'+r+'<=0,"Pagado",IF(AND(E'+r+'<>"",E'+r+'<TODAY()),"Vencido","Pendiente"))',c.done?"Pagado":c.late?"Vencido":"Pendiente"),cS(acct(l.acct)),cS(l.note)])});
+if(L.length){var e1=L.length+1;lr.push([null,cS("Total",4),null,cF("SUM(D2:D"+e1+")",tp,5),null,cF("SUM(F2:F"+e1+")",ta,5),cF("SUM(G2:G"+e1+")",tp-ta,5)])}
+var pk={},P=[],pr=[hd(["Persona","Prestado","Abonado","Saldo"])];L.forEach(function(l){var q=l.person.trim().toLowerCase();if(!pk[q]){pk[q]=1;P.push(l.person.trim())}});
+P.forEach(function(p,i){var r=i+2,q=p.toLowerCase(),a=0,b=0;L.forEach(function(l){if(l.person.trim().toLowerCase()===q){a+=l.amt;b+=lcalc(l).pd}});
+pr.push([cS(p),cF("SUMIFS("+rg("D")+","+rg("B")+',"Préstamo",'+rg("C")+",A"+r+")",a,3),cF("SUMIFS("+rg("D")+","+rg("B")+',"Abono",'+rg("C")+",A"+r+")",b,3),cF("B"+r+"-C"+r,a-b,3)])});
+return[{n:"Préstamos",rows:lr,w:[6,26,18,18,22,16,16,14,22,36]},{n:"Movimientos",rows:mr,w:[14,12,26,16,22,36,12]},{n:"Por persona",rows:pr,w:[28,18,18,18]}]}
+function fullSheets(){var sh=[],cn=function(id){return cat(id).name};
+sh.push(tbl("Gastos",[["Fecha","d"],["Monto","m"],["Categoría","t"],["Medio de pago","t"],["Cuenta o tarjeta","t"],["Nota","t"]],S.tx.slice().sort(ASC).map(function(t){return[t.date,t.amt,cn(t.cat),t.pay==="efectivo"?"Efectivo":t.pay==="cuenta"?"Cuenta":"Tarjeta",t.pay==="cuenta"?acct(t.acct):t.pay==="tarjeta"?cardName(t.card):"",t.note||""]}),[14,16,20,16,24,36]));
+sh.push(tbl("Cuentas",[["Cuenta","t"],["Saldo actual","m"]],S.accts.map(function(a){return[a.name,bal(a.id)]}),[30,18]));
+sh.push(tbl("Mov. cuentas",[["Fecha","d"],["Tipo","t"],["Desde","t"],["Hacia","t"],["Monto","m"],["Nota","t"]],S.mv.slice().sort(ASC).map(function(m){return[m.date,m.type==="transfer"?"Transferencia":m.type==="pagotc"?"Pago de tarjeta":"Ingreso",m.from?acct(m.from):"",m.type==="pagotc"?(cardName(m.to)||"Tarjeta"):acct(m.to),m.amt,m.note||""]}),[14,18,22,22,16,36]));
+sh.push(tbl("Inversiones",[["Nombre","t"],["Tipo","t"],["Capital","m"],["Inicio","d"],["Tasa E.A. %","n"],["Plazo (días)","n"],["Estado","t"],["Sale de","t"]],S.inv.map(function(v){return[v.name,v.kind,v.amt,v.start,v.rate,v.days,v.st==="cerrada"?"Cobrada":"Vigente",acct(v.from)]}),[28,20,16,14,12,12,12,22]));
+sh.push(tbl("Metas",[["Meta","t"],["Objetivo","m"],["Ahorrado","m"],["Fecha límite","d"]],S.goals.map(function(g){return[g.name,g.target,gsv(g),g.deadline]}),[30,18,18,14]));
+sh.push(tbl("Aportes a metas",[["Fecha","d"],["Meta","t"],["Tipo","t"],["Monto","m"],["Cuenta","t"],["Nota","t"]],S.gc.slice().sort(ASC).map(function(p){var g=S.goals.find(function(x){return x.id===p.goal});return[p.date,g?g.name:"(meta eliminada)",p.kind==="r"?"Retiro":"Aporte",p.amt,acct(p.acct),p.note||""]}),[14,28,12,16,22,36]));
+sh.push(tbl("Hitos",[["Fecha","d"],["Actividad","t"],["Monto","m"],["Resultado esperado","t"],["Flujo de libertad mensual","m"],["Notas","t"],["Cumplido (Sí/No)","t"]],S.hitos.slice().sort(ASC).map(function(h){return[h.date,h.act,h.amt,h.res,h.flow,h.note,h.done?"Sí":"No"]}),[14,48,18,34,24,34,16]));
+lsheets().forEach(function(s){sh.push(s)});
+var js=JSON.stringify(S),rr=[[cS("RESPALDO_GASTOS_V1",4)]];for(var i=0;i<js.length;i+=30000)rr.push([cS(js.slice(i,i+30000))]);
+sh.push({n:"Respaldo_no_editar",rows:rr,w:[60]});return sh}
+function lpX(mode){var m=$("lpm");if(!S.loans.length){m.textContent="Aún no tienes préstamos para exportar.";return}
+var b=wbBuild(lsheets()),nm="prestamos-"+today()+".xlsx";
+if(mode==="d"){xDown(b,nm);m.textContent="Descargado: "+nm}else xSend(b,nm,"Préstamos: detalle y movimientos","Te envío el detalle de los préstamos y sus movimientos (Excel).","lpm")}
+function bkX(mode){var m=$("mx"),b=wbBuild(fullSheets()),nm="respaldo-gastos-"+today()+".xlsx";
+if(mode==="d"){xDown(b,nm);m.textContent="Descargado: "+nm+". Guárdalo en un lugar seguro."}else xSend(b,nm,"Respaldo de mis gastos","Respaldo completo de la app de gastos (Excel). Para restaurar, súbelo en Ajustes > Respaldo en Excel.","mx")}
+function xlsxSheets(files){var P=new DOMParser(),ss=[],T=function(el){return Array.prototype.map.call(el.getElementsByTagName("t"),function(x){return x.textContent}).join("")};
+if(files["xl/sharedStrings.xml"])Array.prototype.forEach.call(P.parseFromString(files["xl/sharedStrings.xml"],"text/xml").getElementsByTagName("si"),function(si){ss.push(T(si))});
+return Object.keys(files).filter(function(k){return/worksheets\/sheet\d+\.xml$/.test(k)}).sort(function(a,b){return parseInt(a.match(/(\d+)\.xml/)[1])-parseInt(b.match(/(\d+)\.xml/)[1])}).map(function(nm){var rows=[];
+Array.prototype.forEach.call(P.parseFromString(files[nm],"text/xml").getElementsByTagName("row"),function(rw,ri){var row=[];Array.prototype.forEach.call(rw.getElementsByTagName("c"),function(c){var t=c.getAttribute("t"),v=c.getElementsByTagName("v")[0],val="";
+if(t==="inlineStr")val=T(c);else if(v){val=v.textContent;if(t==="s")val=ss[+val]||"";else if(t==="n"||!t)val=Number(val)}row[colIx(c.getAttribute("r")||"A1")]=val});rows[(+rw.getAttribute("r")||ri+1)-1]=row});return rows})}
+async function bkRestoreX(inp){var f=inp.files&&inp.files[0],m=$("mx");if(!f)return;
+try{if(typeof DecompressionStream==="undefined")throw new Error("Este navegador no puede leer archivos .xlsx.");
+var r=null;xlsxSheets(await unzipX(await f.arrayBuffer())).forEach(function(rows){if(!r&&rows[0]&&String(rows[0][0]==null?"":rows[0][0]).trim()==="RESPALDO_GASTOS_V1")r=rows});
+if(!r)throw new Error("Este Excel no es un respaldo de la app. Usa uno descargado desde Ajustes.");
+var js="";for(var i=1;i<r.length;i++)js+=(r[i]&&r[i][0]!=null?r[i][0]:"");
+var d=JSON.parse(js);if(!d||!Array.isArray(d.tx)||!Array.isArray(d.cats))throw new Error("El respaldo está dañado.");
+if(!confirm("Esto reemplaza todos tus datos actuales por los del archivo. ¿Continuar?")){inp.value="";return}
+S=norm(d);save();tab="g";go()}catch(x){if(m)m.textContent=x&&x.message&&x.message.length<120?x.message:"No pude leer ese archivo."}}
+var o_va=va;va=function(){return o_va()+"<h2>Respaldo en Excel</h2><div class='card' style='padding:12px 14px'><p class='msg' style='margin:0 0 8px'>Un Excel con todos tus datos: gastos, cuentas, inversiones, metas, hitos y préstamos. Trae una hoja llamada Respaldo_no_editar que no debes modificar: con ella puedes restaurar la app subiendo este mismo archivo.</p><div class='btns' style='margin-top:0'><button class='btn' onclick=\"bkX('d')\">⬇️ Descargar</button><button class='btn alt' onclick=\"bkX('s')\">✉️ Enviar por correo</button></div><label>Restaurar desde un respaldo en Excel</label><input type='file' accept='.xlsx' onchange='bkRestoreX(this)'><p class='msg' id='mx'></p><p class='msg'>En el celular, Enviar por correo abre el menú de compartir: eliges tu correo y el Excel ya va adjunto. En el computador se descarga el archivo y se abre un correo en blanco para que lo adjuntes.</p></div>"};
 
 /* ---------- Arranque ---------- */
 S.hitos=Array.isArray(S.hitos)?S.hitos:[];
