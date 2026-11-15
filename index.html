@@ -113,11 +113,11 @@ nav button{font-size:11px;padding:7px 2px}
 <script>
 var MN=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
 var PAL=["#4f46e5","#e11d48","#f59e0b","#10b981","#0ea5e9","#a855f7","#f97316","#64748b"];
-var D={budget:0,goals:[],gc:[],gl:{},accts:[{id:"efectivo",name:"Efectivo",init:0}],mv:[],inv:[],rec:[],rl:{},cards:[],tx:[],cats:[["Comida","🍽️"],["Mercado","🛒"],["Transporte","🚌"],["Vivienda","🏠"],["Servicios","💡"],["Salud","💊"],["Ocio","🎬"],["Ropa","👕"],["Educación","📚"],["Otros","📦"]].map(function(c,i){return{id:"c"+i,name:c[0],emoji:c[1],color:PAL[i%8]}})};
+var D={budget:0,hitos:[],loans:[],lp:[],cl:{},goals:[],gc:[],gl:{},accts:[{id:"efectivo",name:"Efectivo",init:0}],mv:[],inv:[],rec:[],rl:{},cards:[],tx:[],cats:[["Comida","🍽️"],["Mercado","🛒"],["Transporte","🚌"],["Vivienda","🏠"],["Servicios","💡"],["Salud","💊"],["Ocio","🎬"],["Ropa","👕"],["Educación","📚"],["Otros","📦"]].map(function(c,i){return{id:"c"+i,name:c[0],emoji:c[1],color:PAL[i%8]}})};
 var S=load(),tab="g",ed=null,now=new Date(),Y=now.getFullYear(),Mo=now.getMonth();
 var $=function(i){return document.getElementById(i)};
 function load(){try{var r=localStorage.getItem("gastos-v1");if(r){var o=JSON.parse(r);if(o&&Array.isArray(o.tx)&&Array.isArray(o.cats))return norm(o)}}catch(x){}return JSON.parse(JSON.stringify(D))}
-function norm(o){var s={budget:o.budget||0,cards:o.cards||[],tx:o.tx||[],cats:o.cats||[],accts:o.accts||[],mv:o.mv||[],inv:o.inv||[],rec:o.rec||[],rl:o.rl||{},goals:o.goals||[],gc:o.gc||[],gl:o.gl||{}};if(!s.accts.some(function(a){return a.id==="efectivo"}))s.accts.unshift({id:"efectivo",name:"Efectivo",init:0});return s}
+function norm(o){var s={budget:o.budget||0,cards:o.cards||[],tx:o.tx||[],cats:o.cats||[],accts:o.accts||[],mv:o.mv||[],inv:o.inv||[],rec:o.rec||[],rl:o.rl||{},goals:o.goals||[],gc:o.gc||[],gl:o.gl||{},hitos:o.hitos||[],loans:o.loans||[],lp:o.lp||[],cl:o.cl||{}};if(!s.accts.some(function(a){return a.id==="efectivo"}))s.accts.unshift({id:"efectivo",name:"Efectivo",init:0});return s}
 function save(){try{localStorage.setItem("gastos-v1",JSON.stringify(S))}catch(x){}}
 function e(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
 var NF=new Intl.NumberFormat("es-CO",{style:"currency",currency:"COP",maximumFractionDigits:0});
@@ -454,7 +454,7 @@ if(r.mode==="t"||r.freq==="d15"){var n=r.mode==="t"?(+r.n||1):1e4;for(var i=0;i<
 while(d<=t){var y=d.getFullYear(),m=d.getMonth(),L=new Date(y,m+1,0).getDate(),ys=r.freq==="q"?[15,L]:r.freq==="q1"?[15]:r.freq==="q2"?[L]:[Math.min(r.day||1,L)];
 ys.forEach(function(x){var dt=new Date(y,m,x);if(dt>=s&&dt<=t)out.push(ds(dt))});d=new Date(y,m+1,1)}return out}
 function pend(){var L=[];S.rec.forEach(function(r){dues(r).forEach(function(d){var k=r.id+"|"+d;if(!S.rl[k])L.push({r:r,d:d,k:k})})});L.sort(function(a,b){return a.d<b.d?-1:1});
-var h="<button class='btn alt w' onclick=\"edMv('ingreso')\">💰 Registrar ingreso</button>";h+=gb();if(!L.length)return h;
+var h="<button class='btn alt w' onclick=\"edMv('ingreso')\">💰 Registrar ingreso</button>";h+=gb();h+=cpend();if(!L.length)return h;
 return h+"<h2>Por confirmar ("+L.length+")</h2><div class='card'>"+L.map(function(x){var c=cat(x.r.cat);return'<div class="row2"><span class="av" style="--c:'+c.color+'">'+c.emoji+'</span><span class="grow"><b>'+e(x.r.name)+"</b><small>"+fdt(x.d)+" · "+M$(ramt(x.r,x.d))+rcu(x.r,x.d)+'</small></span><button class="ib" aria-label="No se hizo" onclick="rc(\''+x.k+'\',0)">✕</button><button class="ib" aria-label="Sí se hizo" style="background:var(--ac);color:var(--on)" onclick="rc(\''+x.k+'\',1)">✓</button></div>'}).join("")+"</div><p class='msg'>¿Se hicieron estos pagos programados? ✓ los registra como gasto y ✕ los omite.</p>"}
 function rc(k,ok){var p=k.split("|"),r=S.rec.find(function(x){return x.id===p[0]});if(!r||S.rl[k])return;S.rl[k]=ok?"ok":"no";
 if(ok)S.tx.push({id:rid("t"),amt:ramt(r,p[1]),cat:r.cat,pay:r.pay,acct:r.pay==="cuenta"?r.acct:"",card:r.pay==="tarjeta"?r.card:"",date:p[1],note:r.name+(r.mode==="t"?" (cuota "+(Math.round(dbt(r.start,p[1])/15)+1)+" de "+r.n+")":" (recurrente)")});save();render()}
@@ -724,6 +724,24 @@ var d=JSON.parse(js);if(!d||!Array.isArray(d.tx)||!Array.isArray(d.cats))throw n
 if(!confirm("Esto reemplaza todos tus datos actuales por los del archivo. ¿Continuar?")){inp.value="";return}
 S=norm(d);save();tab="g";go()}catch(x){if(m)m.textContent=x&&x.message&&x.message.length<120?x.message:"No pude leer ese archivo."}}
 var o_va=va;va=function(){return o_va()+"<h2>Respaldo en Excel</h2><div class='card' style='padding:12px 14px'><p class='msg' style='margin:0 0 8px'>Un Excel con todos tus datos: gastos, cuentas, inversiones, metas, hitos y préstamos. Trae una hoja llamada Respaldo_no_editar que no debes modificar: con ella puedes restaurar la app subiendo este mismo archivo.</p><div class='btns' style='margin-top:0'><button class='btn' onclick=\"bkX('d')\">⬇️ Descargar</button><button class='btn alt' onclick=\"bkX('s')\">✉️ Enviar por correo</button></div><label>Restaurar desde un respaldo en Excel</label><input type='file' accept='.xlsx' onchange='bkRestoreX(this)'><p class='msg' id='mx'></p><p class='msg'>En el celular, Enviar por correo abre el menú de compartir: eliges tu correo y el Excel ya va adjunto. En el computador se descarga el archivo y se abre un correo en blanco para que lo adjuntes.</p></div>"};
+
+/* ---------- Tarjetas de crédito: fecha de pago y aviso en Gastos ---------- */
+var o_norm4=norm;norm=function(o){var s=o_norm4(o);s.cl=o.cl&&typeof o.cl==="object"&&!Array.isArray(o.cl)?o.cl:{};return s};
+S.cl=S.cl&&typeof S.cl==="object"&&!Array.isArray(S.cl)?S.cl:{};
+var o_edCard=edCard;edCard=function(id){o_edCard(id);var c=S.cards.find(function(x){return x.id===id});ed.pday=c&&c.pday?String(c.pday):"";ed.padv=c&&c.padv!=null?String(c.padv):"3";render()};
+var o_fKard=fKard;fKard=function(){return o_fKard().replace("</div><p class='msg'>La deuda arranca",function(){return"<label>Día de pago de la tarjeta (1 a 31)</label><input id='fpd' inputmode='numeric' maxlength='2' placeholder='Ej. 5' value='"+e(ed.pday||"")+"'><label>Avisarme cuántos días antes</label><input id='fpa' inputmode='numeric' maxlength='2' value='"+e(ed.padv==null?"3":ed.padv)+"'></div><p class='msg'>Con el día de pago, la app te avisa en la pestaña Gastos cuando hay que pagar esta tarjeta, y el aviso se queda hasta que lo atiendas. La fecha de corte es otra cosa: es el día en que el banco cierra el ciclo de compras.</p><p class='msg'>La deuda arranca"})};
+var o_keep4=keep;keep=function(){o_keep4();if(ed&&ed.k==="kard"){var g=function(i){var x=$(i);return x?x.value:""};ed.pday=g("fpd");ed.padv=g("fpa")}};
+function svKard(){keep();var n=ed.name.trim();if(!n){$("fn").focus();return}var cu=parseInt(ed.cut,10),r=parseFloat(String(ed.rate).replace(",",".")),pd=parseInt(ed.pday,10),pa=parseInt(ed.padv,10);
+var o={id:ed.id||rid("k"),name:n,debt0:Number(digits(ed.debt))||0,d0:ed.d0||today(),cut:cu>=1&&cu<=31?cu:0,rate:isNaN(r)||r<0?0:r,pday:pd>=1&&pd<=31?pd:0,padv:pa>=0&&pa<=15?pa:3},i=S.cards.findIndex(function(c){return c.id===ed.id});if(i>=0)S.cards[i]=o;else S.cards.push(o);save();ed=null;go()}
+var o_tcRow=tcRow;tcRow=function(c){var h=o_tcRow(c);if(c.pday&&c.d0)h=h.replace("</small></div>",function(){return" · pago el día "+c.pday+"</small></div>"});return h};
+function cdues(c){var out=[];if(!c.pday||!c.d0)return out;var s=new Date(c.d0+"T00:00:00"),lim=new Date(today()+"T00:00:00");lim.setDate(lim.getDate()+(c.padv==null?3:c.padv));
+var d=new Date(s.getFullYear(),s.getMonth(),1);while(d<=lim){var y=d.getFullYear(),m=d.getMonth(),L=new Date(y,m+1,0).getDate(),dt=new Date(y,m,Math.min(c.pday,L));if(dt>=s&&dt<=lim)out.push(ds(dt));d=new Date(y,m+1,1)}return out}
+function cpend(){var L=[];S.cards.forEach(function(c){if(debt(c)<=0.5)return;var u=cdues(c).filter(function(d){return!S.cl[c.id+"|"+d]});if(u.length){var d=u[u.length-1];L.push({c:c,d:d,k:c.id+"|"+d})}});
+L.sort(function(a,b){return a.d<b.d?-1:1});if(!L.length)return"";
+return"<h2>Tarjetas por pagar ("+L.length+")</h2><div class='card'>"+L.map(function(x){var n=dbt(today(),x.d),late=n<0;return'<div class="row2"><span class="av" style="--c:'+(late?"#e11d48":"#4f46e5")+'">💳</span><span class="grow"><b>'+e(x.c.name)+"</b><small>"+(late?'<span class="neg">Venció hace '+(-n)+(n===-1?" día":" días")+"</span>":n===0?"<b>Vence hoy</b>":"Vence en "+n+(n===1?" día":" días"))+" · "+fdt(x.d)+" · debes "+M$(debt(x.c))+'</small></span><button class="ib" aria-label="Omitir este pago" onclick="cskip(\''+x.k+'\')">✕</button><button class="ib" aria-label="Pagar ahora" style="background:var(--ac);color:var(--on)" onclick="cpay(\''+x.k+'\')">✓</button></div>'}).join("")+"</div><p class='msg'>✓ abre el pago con la deuda ya puesta, para que elijas de qué cuenta sale. ✕ omite el aviso de esa fecha. Si pagas todo, el aviso desaparece solo.</p>"}
+function cskip(k){S.cl[k]="no";save();render()}
+function cpay(k){var p=k.split("|"),c=S.cards.find(function(x){return x.id===p[0]});if(!c)return;edMv("pagotc");ed.to=c.id;ed.amt=dots(Math.max(0,Math.round(debt(c))));ed.pk=k;render()}
+var o_svMv=svMv;svMv=function(){var pk=ed&&ed.pk;o_svMv();if(pk&&ed===null){S.cl[pk]="ok";save()}};
 
 /* ---------- Arranque ---------- */
 S.hitos=Array.isArray(S.hitos)?S.hitos:[];
