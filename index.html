@@ -695,7 +695,7 @@ P.forEach(function(p,i){var r=i+2,q=p.toLowerCase(),a=0,b=0;L.forEach(function(l
 pr.push([cS(p),cF("SUMIFS("+rg("D")+","+rg("B")+',"Préstamo",'+rg("C")+",A"+r+")",a,3),cF("SUMIFS("+rg("D")+","+rg("B")+',"Abono",'+rg("C")+",A"+r+")",b,3),cF("B"+r+"-C"+r,a-b,3)])});
 return[{n:"Préstamos",rows:lr,w:[6,26,18,18,22,16,16,14,22,36]},{n:"Movimientos",rows:mr,w:[14,12,26,16,22,36,12]},{n:"Por persona",rows:pr,w:[28,18,18,18]}]}
 function fullSheets(){var sh=[],cn=function(id){return cat(id).name};
-sh.push(tbl("Gastos",[["Fecha","d"],["Monto","m"],["Categoría","t"],["Medio de pago","t"],["Cuenta o tarjeta","t"],["Nota","t"]],S.tx.slice().sort(ASC).map(function(t){return[t.date,t.amt,cn(t.cat),t.pay==="efectivo"?"Efectivo":t.pay==="cuenta"?"Cuenta":"Tarjeta",t.pay==="cuenta"?acct(t.acct):t.pay==="tarjeta"?cardName(t.card):"",t.note||""]}),[14,16,20,16,24,36]));
+sh.push(tbl("Gastos",[["Fecha","d"],["Monto","m"],["Categoría","t"],["Medio de pago","t"],["Cuenta o tarjeta","t"],["Cuotas","n"],["Nota","t"]],S.tx.slice().sort(ASC).map(function(t){return[t.date,t.amt,cn(t.cat),t.pay==="efectivo"?"Efectivo":t.pay==="cuenta"?"Cuenta":"Tarjeta",t.pay==="cuenta"?acct(t.acct):t.pay==="tarjeta"?cardName(t.card):"",t.cuotas||1,t.note||""]}),[14,16,20,16,24,10,36]));
 sh.push(tbl("Cuentas",[["Cuenta","t"],["Saldo actual","m"]],S.accts.map(function(a){return[a.name,bal(a.id)]}),[30,18]));
 sh.push(tbl("Mov. cuentas",[["Fecha","d"],["Tipo","t"],["Desde","t"],["Hacia","t"],["Monto","m"],["Nota","t"]],S.mv.slice().sort(ASC).map(function(m){return[m.date,m.type==="transfer"?"Transferencia":m.type==="pagotc"?"Pago de tarjeta":"Ingreso",m.from?acct(m.from):"",m.type==="pagotc"?(cardName(m.to)||"Tarjeta"):acct(m.to),m.amt,m.note||""]}),[14,18,22,22,16,36]));
 sh.push(tbl("Inversiones",[["Nombre","t"],["Tipo","t"],["Capital","m"],["Inicio","d"],["Tasa E.A. %","n"],["Plazo (días)","n"],["Estado","t"],["Sale de","t"]],S.inv.map(function(v){return[v.name,v.kind,v.amt,v.start,v.rate,v.days,v.st==="cerrada"?"Cobrada":"Vigente",acct(v.from)]}),[28,20,16,14,12,12,12,22]));
@@ -730,18 +730,53 @@ var o_norm4=norm;norm=function(o){var s=o_norm4(o);s.cl=o.cl&&typeof o.cl==="obj
 S.cl=S.cl&&typeof S.cl==="object"&&!Array.isArray(S.cl)?S.cl:{};
 var o_edCard=edCard;edCard=function(id){o_edCard(id);var c=S.cards.find(function(x){return x.id===id});ed.pday=c&&c.pday?String(c.pday):"";ed.padv=c&&c.padv!=null?String(c.padv):"3";render()};
 var o_fKard=fKard;fKard=function(){return o_fKard().replace("</div><p class='msg'>La deuda arranca",function(){return"<label>Día de pago de la tarjeta (1 a 31)</label><input id='fpd' inputmode='numeric' maxlength='2' placeholder='Ej. 5' value='"+e(ed.pday||"")+"'><label>Avisarme cuántos días antes</label><input id='fpa' inputmode='numeric' maxlength='2' value='"+e(ed.padv==null?"3":ed.padv)+"'></div><p class='msg'>Con el día de pago, la app te avisa en la pestaña Gastos cuando hay que pagar esta tarjeta, y el aviso se queda hasta que lo atiendas. La fecha de corte es otra cosa: es el día en que el banco cierra el ciclo de compras.</p><p class='msg'>La deuda arranca"})};
-var o_keep4=keep;keep=function(){o_keep4();if(ed&&ed.k==="kard"){var g=function(i){var x=$(i);return x?x.value:""};ed.pday=g("fpd");ed.padv=g("fpa")}};
+var o_keep4=keep;keep=function(){o_keep4();var g=function(i){var x=$(i);return x?x.value:""};if(ed&&ed.k==="kard"){ed.pday=g("fpd");ed.padv=g("fpa")}if(ed&&ed.k==="tx"){if($("fq1"))ed.cuo=g("fq1");if($("fni"))ed.noint=g("fni")}};
 function svKard(){keep();var n=ed.name.trim();if(!n){$("fn").focus();return}var cu=parseInt(ed.cut,10),r=parseFloat(String(ed.rate).replace(",",".")),pd=parseInt(ed.pday,10),pa=parseInt(ed.padv,10);
 var o={id:ed.id||rid("k"),name:n,debt0:Number(digits(ed.debt))||0,d0:ed.d0||today(),cut:cu>=1&&cu<=31?cu:0,rate:isNaN(r)||r<0?0:r,pday:pd>=1&&pd<=31?pd:0,padv:pa>=0&&pa<=15?pa:3},i=S.cards.findIndex(function(c){return c.id===ed.id});if(i>=0)S.cards[i]=o;else S.cards.push(o);save();ed=null;go()}
-var o_tcRow=tcRow;tcRow=function(c){var h=o_tcRow(c);if(c.pday&&c.d0)h=h.replace("</small></div>",function(){return" · pago el día "+c.pday+"</small></div>"});return h};
+var o_tcRow=tcRow;tcRow=function(c){if(!c.d0)return o_tcRow(c);var d=debt(c),i=cutInfo(c),cy=0,q=cplan(c);if(i)S.tx.forEach(function(t){if(t.pay==="tarjeta"&&t.card===c.id&&t.date>i.prev&&t.date>=c.d0)cy+=t.amt});
+return'<div class="st"><div class="sr"><span class="av sm" style="--c:#4f46e5">💳</span><span class="grow"><b>'+e(c.name)+'</b></span><b class="amt'+(d>0?" neg":"")+'">'+M$(d)+'</b><button class="ib" onclick="edCard(\''+c.id+'\')" aria-label="Editar">✎</button></div><small>'+(i?"Corte "+fdt(i.next)+" (en "+i.left+" días) · compras del ciclo: "+M$(cy):"Sin día de corte")+(c.pday?" · pago el día "+c.pday:"")+"</small>"+(d>0.5?"<br><small>Próximo pago ≈ <b>"+M$(q.owed)+"</b> "+(c.pday?"el "+fdt(q.nd):"en los próximos 30 días")+(q.int>0.5?" (≈ "+M$(q.int)+" de intereses)":"")+(q.fut>0.5?" · por vencer en cuotas: "+M$(q.fut):"")+"</small>":"")+"</div>"};
 function cdues(c){var out=[];if(!c.pday||!c.d0)return out;var s=new Date(c.d0+"T00:00:00"),lim=new Date(today()+"T00:00:00");lim.setDate(lim.getDate()+(c.padv==null?3:c.padv));
 var d=new Date(s.getFullYear(),s.getMonth(),1);while(d<=lim){var y=d.getFullYear(),m=d.getMonth(),L=new Date(y,m+1,0).getDate(),dt=new Date(y,m,Math.min(c.pday,L));if(dt>=s&&dt<=lim)out.push(ds(dt));d=new Date(y,m+1,1)}return out}
-function cpend(){var L=[];S.cards.forEach(function(c){if(debt(c)<=0.5)return;var u=cdues(c).filter(function(d){return!S.cl[c.id+"|"+d]});if(u.length){var d=u[u.length-1];L.push({c:c,d:d,k:c.id+"|"+d})}});
+function cpend(){var L=[];S.cards.forEach(function(c){var u=cdues(c).filter(function(d){return!S.cl[c.id+"|"+d]});if(!u.length)return;var d=u[u.length-1],ow=cowed(c,d);if(ow<=0.5)return;L.push({c:c,d:d,k:c.id+"|"+d,ow:ow})});
 L.sort(function(a,b){return a.d<b.d?-1:1});if(!L.length)return"";
-return"<h2>Tarjetas por pagar ("+L.length+")</h2><div class='card'>"+L.map(function(x){var n=dbt(today(),x.d),late=n<0;return'<div class="row2"><span class="av" style="--c:'+(late?"#e11d48":"#4f46e5")+'">💳</span><span class="grow"><b>'+e(x.c.name)+"</b><small>"+(late?'<span class="neg">Venció hace '+(-n)+(n===-1?" día":" días")+"</span>":n===0?"<b>Vence hoy</b>":"Vence en "+n+(n===1?" día":" días"))+" · "+fdt(x.d)+" · debes "+M$(debt(x.c))+'</small></span><button class="ib" aria-label="Omitir este pago" onclick="cskip(\''+x.k+'\')">✕</button><button class="ib" aria-label="Pagar ahora" style="background:var(--ac);color:var(--on)" onclick="cpay(\''+x.k+'\')">✓</button></div>'}).join("")+"</div><p class='msg'>✓ abre el pago con la deuda ya puesta, para que elijas de qué cuenta sale. ✕ omite el aviso de esa fecha. Si pagas todo, el aviso desaparece solo.</p>"}
+return"<h2>Tarjetas por pagar ("+L.length+")</h2><div class='card'>"+L.map(function(x){var n=dbt(today(),x.d),late=n<0;return'<div class="row2"><span class="av" style="--c:'+(late?"#e11d48":"#4f46e5")+'">💳</span><span class="grow"><b>'+e(x.c.name)+"</b><small>"+(late?'<span class="neg">Venció hace '+(-n)+(n===-1?" día":" días")+"</span>":n===0?"<b>Vence hoy</b>":"Vence en "+n+(n===1?" día":" días"))+" · "+fdt(x.d)+" · pago estimado <b>"+M$(x.ow)+"</b> · deuda total "+M$(debt(x.c))+'</small></span><button class="ib" aria-label="Omitir este pago" onclick="cskip(\''+x.k+'\')">✕</button><button class="ib" aria-label="Pagar ahora" style="background:var(--ac);color:var(--on)" onclick="cpay(\''+x.k+'\')">✓</button></div>'}).join("")+"</div><p class='msg'>El pago estimado suma lo que vence en esa fecha (compras ya facturadas y cuotas con sus intereses). ✓ abre el pago con ese valor, para que elijas de qué cuenta sale. ✕ omite el aviso de esa fecha. Si pagas lo que vence, el aviso desaparece solo.</p>"}
 function cskip(k){S.cl[k]="no";save();render()}
-function cpay(k){var p=k.split("|"),c=S.cards.find(function(x){return x.id===p[0]});if(!c)return;edMv("pagotc");ed.to=c.id;ed.amt=dots(Math.max(0,Math.round(debt(c))));ed.pk=k;render()}
+function cpay(k){var p=k.split("|"),c=S.cards.find(function(x){return x.id===p[0]});if(!c)return;edMv("pagotc");ed.to=c.id;var q=cowed(c,p[1]);ed.amt=dots(Math.round(q>0.5?q:Math.max(0,debt(c))));ed.pk=k;render()}
 var o_svMv=svMv;svMv=function(){var pk=ed&&ed.pk;o_svMv();if(pk&&ed===null){S.cl[pk]="ok";save()}};
+
+/* ---------- Compras con tarjeta a cuotas: pago e intereses estimados ---------- */
+function addM(iso,k,day){var d=dd(iso),y=d.getFullYear(),m=d.getMonth()+k,L=new Date(y,m+1,0).getDate();return ds(new Date(y,m,Math.min(day,L)))}
+function npday(c,iso){var t=dd(iso),y=t.getFullYear(),m=t.getMonth(),L=function(a,b){return new Date(a,b+1,0).getDate()},p=new Date(y,m,Math.min(c.pday,L(y,m)));if(p<t)p=new Date(y,m+1,Math.min(c.pday,L(y,m+1)));return ds(p)}
+function cfirst(c,date){var L=function(a,b){return new Date(a,b+1,0).getDate()},t=dd(date),y=t.getFullYear(),m=t.getMonth();
+if(c.pday){var cd;if(c.cut){cd=new Date(y,m,Math.min(c.cut,L(y,m)));if(t>cd)cd=new Date(y,m+1,Math.min(c.cut,L(y,m+1)))}else cd=t;
+var py=cd.getFullYear(),pm=cd.getMonth(),pd=new Date(py,pm,Math.min(c.pday,L(py,pm)));if(pd<=cd)pd=new Date(py,pm+1,Math.min(c.pday,L(py,pm+1)));return ds(pd)}
+return addM(date,1,t.getDate())}
+function citems(c){var out=[],i0=c.rate>0?Math.pow(1+c.rate/100,1/12)-1:0;
+if(+c.debt0>0)out.push({d:c.pday?npday(c,c.d0):c.d0,cap:+c.debt0,int:0});
+S.tx.forEach(function(t){if(t.pay!=="tarjeta"||t.card!==c.id||t.date<c.d0)return;var n=Math.max(1,t.cuotas||1),i=t.noint?0:i0,P=t.amt,f=cfirst(c,t.date);
+if(n===1){out.push({d:f,cap:P,int:0});return}
+var pm=i>0?P*i/(1-Math.pow(1+i,-n)):P/n,bal=P;
+for(var k=0;k<n;k++){var it=bal*i,cp=k===n-1?bal:pm-it;bal-=cp;out.push({d:k?addM(f,k,c.pday||dd(f).getDate()):f,cap:cp,int:it})}});
+return out}
+function cpaid(c){var s=0;S.mv.forEach(function(m){if(m.type==="pagotc"&&m.to===c.id&&m.date>=c.d0)s+=m.amt});return s}
+function cowed(c,D){var s=0;citems(c).forEach(function(x){if(x.d<=D)s+=x.cap+x.int});return Math.max(0,s-cpaid(c))}
+function cplan(c){var it=citems(c),t=today(),nd=c.pday?npday(c,t):addD(t,31),paid=cpaid(c),tot=0,ti=0,tt=0,fut=0;
+it.forEach(function(x){if(x.d<=nd){tot+=x.cap+x.int;ti+=x.int}else fut+=x.cap;if(x.d<=t)tt+=x.int});
+var owed=Math.max(0,tot-paid);return{nd:nd,owed:owed,int:Math.min(Math.max(0,ti-Math.min(paid,tt)),owed),fut:fut}}
+var o_debt=debt;debt=function(c){var d=o_debt(c);if(!c.d0)return d;var si=0,t=today();citems(c).forEach(function(x){if(x.d<=t)si+=x.int});return d+Math.min(cpaid(c),si)};
+var o_pyX=pyX;pyX=function(t){var s=o_pyX(t);return t.pay==="tarjeta"&&t.cuotas>1?s+" · "+t.cuotas+" cuotas":s};
+var o_edTx=edTx;edTx=function(id){o_edTx(id);var t=S.tx.find(function(x){return x.id===id});ed.cuo=t&&t.cuotas?String(t.cuotas):"1";ed.noint=t&&t.noint?"1":"0";render()};
+var o_form4=form;form=function(){var h=o_form4();if(ed.k==="tx"&&ed.pay==="tarjeta")h=h.replace("<label>Fecha</label>",function(){return"<label>¿A cuántas cuotas?</label><input id='fq1' inputmode='numeric' maxlength='2' value='"+e(ed.cuo||"1")+"' oninput='dl()'><label>Intereses de las cuotas</label><select id='fni' onchange='dl()'><option value='0'"+(ed.noint==="1"?"":" selected")+">Con el interés de la tarjeta</option><option value='1'"+(ed.noint==="1"?" selected":"")+">Sin interés (0 %)</option></select><p class='msg' id='cqm'></p><label>Fecha</label>"});return h};
+function cprev(){var p=$("cqm");if(!p||!ed||ed.k!=="tx"||!$("fq1"))return;var a=Number(digits($("fa").value))||0,q=parseInt($("fq1").value,10)||1,sel=$("fc"),cid=sel?sel.value:ed.card,c=S.cards.find(function(x){return x.id===cid}),ni=$("fni")&&$("fni").value==="1";
+if(q<2){p.textContent="A una cuota: se paga completo en tu próximo pago, sin intereses si pagas el total del extracto.";return}if(!a){p.textContent="";return}
+var i=!ni&&c&&c.rate>0?Math.pow(1+c.rate/100,1/12)-1:0,pm=i>0?a*i/(1-Math.pow(1+i,-q)):a/q;
+p.innerHTML="Pagarías <b>"+q+" cuotas de ≈ "+M$(pm)+"</b>"+(i>0?" · intereses totales ≈ "+M$(pm*q-a):ni?" · sin intereses":"")+(!ni&&!c?"<br>Elige la tarjeta para estimar los intereses.":!ni&&c&&!(c.rate>0)?"<br>Esta tarjeta no tiene tasa configurada: configúrala en Ajustes y calculo los intereses.":"")}
+var o_dl=dl;dl=function(){o_dl();cprev()};
+function svTx(){keep();var amt=Number(digits(ed.amt));if(!amt){$("fa").focus();return}if(!ed.date){$("fd").focus();return}
+var q=parseInt(ed.cuo,10);if(!(q>=1))q=1;if(q>60)q=60;
+var o={id:ed.id||rid("t"),amt:amt,cat:ed.cat,pay:ed.pay,acct:ed.pay==="cuenta"?ed.acct:"",card:ed.pay==="tarjeta"?ed.card:"",date:ed.date,note:ed.note.trim()},i=S.tx.findIndex(function(t){return t.id===ed.id});
+if(ed.pay==="tarjeta"&&q>1){o.cuotas=q;if(ed.noint==="1")o.noint=1}
+if(i>=0)S.tx[i]=o;else S.tx.push(o);Y=+o.date.slice(0,4);Mo=+o.date.slice(5,7)-1;save();ed=null;tab="g";go()}
 
 /* ---------- Arranque ---------- */
 S.hitos=Array.isArray(S.hitos)?S.hitos:[];
