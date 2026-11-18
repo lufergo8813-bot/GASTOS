@@ -454,7 +454,7 @@ if(r.mode==="t"||r.freq==="d15"){var n=r.mode==="t"?(+r.n||1):1e4;for(var i=0;i<
 while(d<=t){var y=d.getFullYear(),m=d.getMonth(),L=new Date(y,m+1,0).getDate(),ys=r.freq==="q"?[15,L]:r.freq==="q1"?[15]:r.freq==="q2"?[L]:[Math.min(r.day||1,L)];
 ys.forEach(function(x){var dt=new Date(y,m,x);if(dt>=s&&dt<=t)out.push(ds(dt))});d=new Date(y,m+1,1)}return out}
 function pend(){var L=[];S.rec.forEach(function(r){dues(r).forEach(function(d){var k=r.id+"|"+d;if(!S.rl[k])L.push({r:r,d:d,k:k})})});L.sort(function(a,b){return a.d<b.d?-1:1});
-var h="<button class='btn alt w' onclick=\"edMv('ingreso')\">💰 Registrar ingreso</button>";h+=gb();h+=cpend();if(!L.length)return h;
+var h="<button class='btn alt w' onclick=\"edMv('ingreso')\">💰 Registrar ingreso</button>";h+=gb();h+=cpend();h+=lpend2();if(!L.length)return h;
 return h+"<h2>Por confirmar ("+L.length+")</h2><div class='card'>"+L.map(function(x){var c=cat(x.r.cat);return'<div class="row2"><span class="av" style="--c:'+c.color+'">'+c.emoji+'</span><span class="grow"><b>'+e(x.r.name)+"</b><small>"+fdt(x.d)+" · "+M$(ramt(x.r,x.d))+rcu(x.r,x.d)+'</small></span><button class="ib" aria-label="No se hizo" onclick="rc(\''+x.k+'\',0)">✕</button><button class="ib" aria-label="Sí se hizo" style="background:var(--ac);color:var(--on)" onclick="rc(\''+x.k+'\',1)">✓</button></div>'}).join("")+"</div><p class='msg'>¿Se hicieron estos pagos programados? ✓ los registra como gasto y ✕ los omite.</p>"}
 function rc(k,ok){var p=k.split("|"),r=S.rec.find(function(x){return x.id===p[0]});if(!r||S.rl[k])return;S.rl[k]=ok?"ok":"no";
 if(ok)S.tx.push({id:rid("t"),amt:ramt(r,p[1]),cat:r.cat,pay:r.pay,acct:r.pay==="cuenta"?r.acct:"",card:r.pay==="tarjeta"?r.card:"",date:p[1],note:r.name+(r.mode==="t"?" (cuota "+(Math.round(dbt(r.start,p[1])/15)+1)+" de "+r.n+")":" (recurrente)")});save();render()}
@@ -489,7 +489,7 @@ o_keep();if(ed.k==="rec"&&$("fnq"))ed.n=$("fnq").value};
 var o_form=form;form=function(){return ed.k==="hbulk"?fHbulk():ed.k==="hito"?fHito():o_form()};
 function render(){document.querySelectorAll("nav button").forEach(function(b){b.className=b.dataset.t===tab?"on":""});
 $("fab").style.display=(!ed&&tab==="g")?"flex":"none";$("nav").style.display=ed?"none":"flex";
-$("app").innerHTML=ed?form():({g:vg,r:vr,c:vc,i:vi,m:vm,h:vh,p:vp,a:va})[tab]();if(ed&&ed.k==="tx")dl();if(ed&&ed.k==="rec")rwire()}
+$("app").innerHTML=ed?form():({g:vg,r:vr,c:vc,i:vi,m:vm,h:vh,p:vp,a:va})[tab]();if(ed&&ed.k==="tx")dl();if(ed&&ed.k==="rec")rwire();if(ed&&ed.k==="loan")lwire()}
 function hlate(h){return!h.done&&h.date<today()}
 function gb(){var p=gpend().length,late=S.goals.filter(function(g){return ginfo(g).late}).length,hl=S.hitos.filter(hlate).length,o="";
 if(p||late)o+="<button class='btn alt w' onclick=\"tab='m';go()\">🎯 "+(p?p+(p===1?" aporte de ahorro por confirmar":" aportes de ahorro por confirmar"):"")+(p&&late?" · ":"")+(late?late+(late===1?" meta atrasada":" metas atrasadas"):"")+"</button>";
@@ -618,82 +618,143 @@ function xSend(b,nm,sub,body,mid){var f=null;try{f=new File([b],nm,{type:b.type}
 if(f&&navigator.canShare&&navigator.canShare({files:[f]})){navigator.share({files:[f],title:sub,text:body}).then(function(){var m=$(mid);if(m)m.textContent="Listo: elige tu correo en el menú y el Excel ya va adjunto."}).catch(function(x){if(!x||x.name!=="AbortError")xFall(b,nm,sub,body,mid)});return}
 xFall(b,nm,sub,body,mid)}
 
-/* ---------- Préstamos a otras personas ---------- */
-var lpf="";
+/* ---------- Préstamos que hice y deudas que tengo: interés, administración y pactos de pago ---------- */
+var lpf="",lpd="p",UNIT={s:"semanales",q:"quincenales",m:"mensuales",d:"cada N días"};
 function lid(p){return p+Date.now()+"_"+(hbN++)}
 var o_norm3=norm;norm=function(o){var s=o_norm3(o);s.loans=Array.isArray(o.loans)?o.loans:[];s.lp=Array.isArray(o.lp)?o.lp:[];return s};
 S.loans=Array.isArray(S.loans)?S.loans:[];S.lp=Array.isArray(S.lp)?S.lp:[];
-var o_bal=bal;bal=function(id){var b=o_bal(id);S.loans.forEach(function(l){if(l.acct===id)b-=l.amt});S.lp.forEach(function(p){if(p.acct===id)b+=p.amt});return b};
-var o_rmAc=rmAc;rmAc=function(b){if(S.loans.some(function(l){return l.acct===ed.id})||S.lp.some(function(p){return p.acct===ed.id})){$("ma").textContent="No se puede eliminar: tiene préstamos o abonos. Puedes cambiarle el nombre.";return}o_rmAc(b)};
+var o_bal=bal;bal=function(id){var b=o_bal(id);S.loans.forEach(function(l){if(l.acct===id)b+=(l.dir==="d"?l.amt:-l.amt)});S.lp.forEach(function(p){if(p.acct===id){var l=S.loans.find(function(x){return x.id===p.loan});if(l)b+=(l.dir==="d"?-p.amt:p.amt)}});return b};
+var o_rmAc=rmAc;rmAc=function(b){if(S.loans.some(function(l){return l.acct===ed.id})||S.lp.some(function(p){return p.acct===ed.id})){$("ma").textContent="No se puede eliminar: tiene préstamos, deudas o abonos. Puedes cambiarle el nombre.";return}o_rmAc(b)};
 var o_keep3=keep;keep=function(){var g=function(i){var x=$(i);return x?x.value:""};
-if(ed.k==="loan"){ed.person=g("fn");ed.amt=g("fa");ed.acct=g("ff");ed.date=g("fd");ed.due=g("fv");ed.note=g("fo");return}
-if(ed.k==="lp"){ed.amt=g("fa");ed.loan=g("fg");ed.acct=g("ff");ed.date=g("fd");ed.note=g("fo");return}
+if(ed.k==="loan"){ed.person=g("fn");ed.amt=g("fa");if($("ff"))ed.acct=g("ff");ed.date=g("fd");if($("fv"))ed.due=g("fv");ed.note=g("fo");ed.ir=g("fir");ed.irt=g("firt");ed.fee=g("ffe");ed.ft=g("fft");if($("fpm"))ed.pm=g("fpm");if($("fpn"))ed.pn=g("fpn");if($("fpu"))ed.pu=g("fpu");if($("fpnd"))ed.pnd=g("fpnd");if($("fpf"))ed.pf=g("fpf");
+if(ed.rows)ed.rows=ed.rows.map(function(r,i){return{d:$("frd"+i)?g("frd"+i):r.d,a:$("fra"+i)?g("fra"+i):r.a}});return}
+if(ed.k==="lp"){ed.amt=g("fa");ed.loan=g("fg");if($("ff"))ed.acct=g("ff");ed.date=g("fd");ed.note=g("fo");return}
 o_keep3()};
 var o_form3=form;form=function(){return ed.k==="loan"?fLoan():ed.k==="lp"?fLp():o_form3()};
-var o_vc=vc;vc=function(){var h=o_vc(),T=lpTotals(S.loans);return h.replace("</section>",function(){return"</section><button class='btn alt w' onclick=\"tab='p';go()\">🤝 Préstamos a otras personas"+(S.loans.length?" · te deben "+M$(Math.max(0,T.owed)):"")+"</button>"})};
-function lcalc(l){var pd=0;S.lp.forEach(function(p){if(p.loan===l.id)pd+=p.amt});var sal=l.amt-pd;return{pd:pd,sal:sal,done:sal<=0,late:sal>0&&!!l.due&&l.due<today()}}
-function lpeople(){var k={},o=[];S.loans.forEach(function(l){var p=l.person.trim(),q=p.toLowerCase();if(!k[q]){k[q]=1;o.push(p)}});return o.sort(function(a,b){return a.localeCompare(b,"es")})}
+var o_vc=vc;vc=function(){var h=o_vc(),a=lpTotals(S.loans.filter(function(l){return l.dir!=="d"})),b=lpTotals(S.loans.filter(function(l){return l.dir==="d"}));
+return h.replace("</section>",function(){return"</section><button class='btn alt w' onclick=\"tab='p';go()\">🤝 Préstamos y deudas"+(S.loans.length?" · te deben "+M$(a.owed)+" · debes "+M$(b.owed):"")+"</button>"})};
+/* --- cálculo --- */
+function lmr(l){var r=+l.ir||0;return l.irt==="a"?Math.pow(1+r/100,1/12)-1:r/100}
+function lsim(l,pays,upto){var K=l.amt,Iu=0,Fu=0,t=l.date,mr=lmr(l),fv=+l.fee||0,pi=0,pf=0,pc=0;
+var step=function(to){var days=Math.max(0,dbt(t,to));if(days>0&&K>0.5){Iu+=K*mr*days/30;Fu+=(l.ft==="p"?K*fv/100:fv)*days/30}if(to>t)t=to};
+pays.forEach(function(p){if(p.d>upto)return;step(p.d);var a=p.a,x=Math.min(a,Fu);Fu-=x;pf+=x;a-=x;x=Math.min(a,Iu);Iu-=x;pi+=x;a-=x;x=Math.min(a,K);K-=x;pc+=x});
+step(upto);return{K:K,I:Iu,F:Fu,tot:K+Iu+Fu,pi:pi,pf:pf,pc:pc}}
+function lpays(l,ex){return S.lp.filter(function(p){return p.loan===l.id&&p.id!==ex}).sort(function(a,b){return a.date<b.date?-1:a.date>b.date?1:(a.id<b.id?-1:1)}).map(function(p){return{d:p.date,a:p.amt}})}
+function lsched(l){return l.sch||[]}
+function lcalc(l){var P=lpays(l),pd=0;P.forEach(function(p){pd+=p.a});var r=lsim(l,P,today()),done=r.tot<=0.5,late=false;
+if(!done){if(l.due&&l.due<today())late=true;var cum=0;lsched(l).forEach(function(c){cum+=c.a;if(c.d<today()&&cum-pd>0.5)late=true})}
+return{pd:pd,sal:r.tot,cap:r.K,int:r.I,fee:r.F,pc:r.pc,done:done,late:late}}
+function lowedAt(l,date,ex){return lsim(l,lpays(l,ex),date).tot}
+function lgen(l){var pl=l.plan,n=Math.max(1,Math.min(120,pl.n|0)),ds_=[],step=pl.u==="s"?7:pl.u==="q"?15:Math.max(1,+pl.nd||30);
+for(var k=0;k<n;k++)ds_.push(pl.u==="m"?addM(pl.f,k,dd(pl.f).getDate()):addD(pl.f,step*k));
+var fin=function(X){return lsim(l,ds_.map(function(d){return{d:d,a:X}}),ds_[n-1]).tot},lo=0,hi=Math.max(1,l.amt*3);
+for(var i=0;i<60;i++){var mid=(lo+hi)/2;if(fin(mid)>0.5)lo=mid;else hi=mid}
+var X=Math.ceil(hi),out=ds_.map(function(d){return{d:d,a:X}});
+out[n-1].a=Math.max(0,Math.round(lsim(l,out.slice(0,n-1),ds_[n-1]).tot));return out}
+function lpNext(l){var cum=0,pd=lcalc(l).pd,r=null;lsched(l).forEach(function(c){cum+=c.a;if(!r&&cum-pd>0.5)r={d:c.d,a:Math.min(c.a,cum-pd)}});return r}
+function lpendC(l){var sc=lsched(l);if(!sc.length)return null;var c=lcalc(l);if(c.done)return null;var lim=addD(today(),3),cum=0,first=null,need=0;
+sc.forEach(function(x){cum+=x.a;if(x.d<=lim&&cum-c.pd>0.5){if(!first)first=x.d;need=cum-c.pd}});return first?{d:first,a:Math.min(need,c.sal)}:null}
+function lpend2(){var L=[];S.loans.forEach(function(l){var x=lpendC(l);if(x&&!S.cl["L"+l.id+"|"+x.d])L.push({l:l,d:x.d,a:x.a,k:"L"+l.id+"|"+x.d})});L.sort(function(a,b){return a.d<b.d?-1:1});if(!L.length)return"";
+return"<h2>Préstamos y deudas: pagos pactados ("+L.length+")</h2><div class='card'>"+L.map(function(x){var n=dbt(today(),x.d),late=n<0,deb=x.l.dir==="d";return'<div class="row2"><span class="av" style="--c:'+(late?"#e11d48":deb?"#f59e0b":"#0ea5e9")+'">'+(deb?"💸":"🤝")+'</span><span class="grow"><b>'+(deb?"Pagar a ":"Cobrar a ")+e(x.l.person)+"</b><small>"+(late?'<span class="neg">Venció hace '+(-n)+(n===-1?" día":" días")+"</span>":n===0?"<b>Vence hoy</b>":"Vence en "+n+(n===1?" día":" días"))+" · "+fdt(x.d)+" · "+M$(x.a)+'</small></span><button class="ib" aria-label="Omitir" onclick="lskip(\''+x.k+'\')">✕</button><button class="ib" aria-label="Registrar" style="background:var(--ac);color:var(--on)" onclick="lpay(\''+x.k+'\')">✓</button></div>'}).join("")+"</div><p class='msg'>✓ abre el abono con el valor pactado para que lo confirmes. ✕ omite el aviso de esa fecha. Cuando abonas lo pactado, el aviso desaparece solo.</p>"}
+function lskip(k){S.cl[k]="no";save();render()}
+function lpay(k){var id=k.slice(1).split("|")[0],l=S.loans.find(function(x){return x.id===id});if(!l)return;var x=lpendC(l);edLp("",id);if(x)ed.amt=dots(Math.round(x.a));ed.pk=k;render()}
+/* --- vista --- */
+function lpeople(dir){dir=dir||lpd;var k={},o=[];S.loans.forEach(function(l){if((l.dir||"p")!==dir)return;var p=l.person.trim(),q=p.toLowerCase();if(!k[q]){k[q]=1;o.push(p)}});return o.sort(function(a,b){return a.localeCompare(b,"es")})}
 function lpMatch(l){return!lpf||l.person.trim().toLowerCase()===lpf.toLowerCase()}
 function lpFilter(v){lpf=v;render()}
-function lpTotals(L){var pr=0,pd=0;L.forEach(function(l){pr+=l.amt;pd+=lcalc(l).pd});return{pr:pr,pd:pd,owed:pr-pd}}
-function lcard(l){var c=lcalc(l),pct=l.amt?Math.min(100,Math.round(c.pd*100/l.amt)):0,dl=l.due?dbt(l.due,today()):0;
-var h='<div class="card ic" style="margin-top:12px"><div class="sr"><span class="av" style="--c:#0ea5e9">🤝</span><span class="grow"><b>'+e(l.person)+'</b><small>Prestado el '+fdt(l.date)+(l.due?" · pagar el "+fdt(l.due):"")+" · desde "+e(acct(l.acct))+'</small></span><button class="ib" onclick="edLoan(\''+l.id+'\')" aria-label="Editar">✎</button></div>';
-h+='<div class="kp"><div><b>'+M$(l.amt)+'</b><small>prestado</small></div><div><b class="pos">'+M$(c.pd)+'</b><small>abonado</small></div><div><b>'+M$(Math.max(0,c.sal))+'</b><small>saldo</small></div></div><div class="bar" style="--c:'+(c.late?"#e11d48":"#10b981")+'"><i style="width:'+pct+'%"></i></div>';
-h+=c.done?'<span class="bd ok">✅ Pagado</span>':c.late?'<span class="bd no">⚠️ Vencido hace '+dl+(dl===1?" día":" días")+"</span>":'<span class="bd ok">'+(l.due?(dl===0?"Vence hoy":"Faltan "+(-dl)+(dl===-1?" día":" días")+" para la fecha pactada"):"Pendiente, sin fecha pactada")+"</span>";
+function lpSet(d){lpd=d;lpf="";render()}
+function lpTotals(L){var pr=0,pd=0,ow=0;L.forEach(function(l){var c=lcalc(l);pr+=l.amt;pd+=c.pd;ow+=c.sal});return{pr:pr,pd:pd,owed:ow}}
+function lcond(l){var a=[];if(+l.ir>0)a.push(String(l.ir).replace(".",",")+" % "+(l.irt==="a"?"anual (E.A.)":"mensual"));if(+l.fee>0)a.push("administración "+(l.ft==="p"?String(l.fee).replace(".",",")+" % mensual":M$(l.fee)+" por mes"));
+a.push(l.pm==="i"&&l.plan?l.plan.n+" cuotas "+(l.plan.u==="d"?"cada "+l.plan.nd+" días":UNIT[l.plan.u]):l.pm==="c"?lsched(l).length+" cuotas pactadas":"pago libre"+(l.due?" hasta el "+fdt(l.due):""));return a.join(" · ")}
+function lcard(l){var c=lcalc(l),deb=l.dir==="d",pct=l.amt?Math.min(100,Math.round(c.pc*100/l.amt)):0,dl=l.due?dbt(l.due,today()):0,nx=lpNext(l),sc=lsched(l);
+var h='<div class="card ic" style="margin-top:12px"><div class="sr"><span class="av" style="--c:'+(deb?"#f59e0b":"#0ea5e9")+'">'+(deb?"💸":"🤝")+'</span><span class="grow"><b>'+e(l.person)+'</b><small>'+(deb?"Recibido el ":"Prestado el ")+fdt(l.date)+(l.acct?" · "+(deb?"a ":"desde ")+e(acct(l.acct)):"")+'</small></span><button class="ib" onclick="edLoan(\''+l.id+'\')" aria-label="Editar">✎</button></div><small>'+lcond(l)+"</small>";
+h+='<div class="kp"><div><b>'+M$(Math.max(0,c.cap))+'</b><small>capital</small></div><div><b>'+M$(c.int+c.fee)+'</b><small>interés y admin.</small></div><div><b>'+M$(c.sal)+'</b><small>total hoy</small></div></div><div class="bar" style="--c:'+(c.late?"#e11d48":"#10b981")+'"><i style="width:'+pct+'%"></i></div><small>Capital inicial '+M$(l.amt)+" · has pagado en total "+M$(c.pd)+"</small><br>";
+h+=c.done?'<span class="bd ok">✅ Pagado</span>':c.late?'<span class="bd no">⚠️ '+(l.due&&l.due<today()?"Vencido hace "+dl+(dl===1?" día":" días"):"Tiene pagos pactados vencidos")+"</span>":'<span class="bd ok">'+(nx?"Próxima cuota: "+fdt(nx.d)+" · "+M$(nx.a):l.due?(dl===0?"Vence hoy":"Faltan "+(-dl)+(dl===-1?" día":" días")+" para la fecha límite"):"Pendiente, sin fecha pactada")+"</span>";
 if(l.note)h+="<br><small>📝 "+e(l.note)+"</small>";
-if(!c.done)h+='<button class="btn alt w" onclick="edLp(\'\',\''+l.id+'\')">💰 Registrar abono</button>';
+if(sc.length){var cum=0;h+="<details style='margin-top:8px'><summary><small>Ver plan de cuotas ("+sc.length+")</small></summary>"+sc.slice(0,36).map(function(x){cum+=x.a;var ok=cum-c.pd<=0.5,lt=!ok&&x.d<today();return"<div class='row2' style='padding:6px 0'><span class='grow'><small>"+fdt(x.d)+"</small></span><b>"+M$(x.a)+"</b><small class='"+(ok?"pos":lt?"neg":"")+"'>"+(ok?"✓ cubierta":lt?"vencida":"pendiente")+"</small></div>"}).join("")+(sc.length>36?"<small>…y "+(sc.length-36)+" más</small>":"")+"</details>"}
+if(!c.done)h+='<button class="btn alt w" onclick="edLp(\'\',\''+l.id+'\')">'+(deb?"💸 Registrar pago":"💰 Registrar abono")+"</button>";
 return h+"</div>"}
 function lmov(L){var ids={},M=[];L.forEach(function(l){ids[l.id]=l;M.push({k:"l",d:l.date,id:l.id,l:l,a:l.amt})});S.lp.forEach(function(p){if(ids[p.loan])M.push({k:"p",d:p.date,id:p.id,l:ids[p.loan],a:p.amt,n:p.note,c:p.acct})});
 M.sort(function(a,b){return a.d<b.d?1:a.d>b.d?-1:(a.id<b.id?1:-1)});return M}
 function vp(){var ppl=lpeople();if(lpf&&!ppl.some(function(p){return p.toLowerCase()===lpf.toLowerCase()}))lpf="";
-var L=S.loans.filter(lpMatch),T=lpTotals(L),act=L.filter(function(l){return!lcalc(l).done}).sort(function(a,b){return(a.due||"9999")<(b.due||"9999")?-1:1}),dn=L.filter(function(l){return lcalc(l).done}).sort(function(a,b){return a.date<b.date?1:-1}),nm=ppl.filter(function(p){return p.toLowerCase()===lpf.toLowerCase()})[0]||"";
-var h="<button class='btn alt' onclick=\"tab='c';go()\">‹ Cuentas</button><h1 style='margin-top:12px'>Préstamos</h1><section class='hero'><span>"+(lpf?"Te debe "+e(nm):"Te deben")+"</span><strong>"+M$(Math.max(0,T.owed))+"</strong><small>"+(L.length?"Prestaste "+M$(T.pr)+" · te han pagado "+M$(T.pd):"Aún no has registrado préstamos")+"</small></section>";
+var deb=lpd==="d",D=S.loans.filter(function(l){return(l.dir||"p")===lpd}),L=D.filter(lpMatch),T=lpTotals(L),
+A=lpTotals(S.loans.filter(function(l){return l.dir!=="d"})),B=lpTotals(S.loans.filter(function(l){return l.dir==="d"})),
+act=L.filter(function(l){return!lcalc(l).done}).sort(function(a,b){return(a.due||"9999")<(b.due||"9999")?-1:1}),dn=L.filter(function(l){return lcalc(l).done}).sort(function(a,b){return a.date<b.date?1:-1}),nm=ppl.filter(function(p){return p.toLowerCase()===lpf.toLowerCase()})[0]||"";
+var h="<button class='btn alt' onclick=\"tab='c';go()\">‹ Cuentas</button><h1 style='margin-top:12px'>Préstamos y deudas</h1><div class='seg'><button class='btn"+(deb?" alt":"")+"' onclick=\"lpSet('p')\">🤝 Me deben · "+M$(A.owed)+"</button><button class='btn"+(deb?"":" alt")+"' onclick=\"lpSet('d')\">💸 Yo debo · "+M$(B.owed)+"</button></div>";
+h+="<section class='hero' style='margin-top:12px'><span>"+(deb?(lpf?"Le debes a "+e(nm):"Debes"):(lpf?"Te debe "+e(nm):"Te deben"))+"</span><strong>"+M$(T.owed)+"</strong><small>"+(L.length?(deb?"Te prestaron ":"Prestaste ")+M$(T.pr)+" · "+(deb?"has pagado ":"te han pagado ")+M$(T.pd)+" · incluye intereses y administración causados":(deb?"Aún no has registrado deudas":"Aún no has registrado préstamos"))+"</small></section>";
 if(ppl.length>1)h+="<label>Ver a</label><select onchange='lpFilter(this.value)'><option value=''>Todas las personas</option>"+ppl.map(function(p){return"<option value=\""+e(p)+"\""+(p.toLowerCase()===lpf.toLowerCase()?" selected":"")+">"+e(p)+"</option>"}).join("")+"</select>";
-h+="<button class='btn w' onclick='edLoan()'>+ Nuevo préstamo</button><div class='btns'><button class='btn alt' onclick=\"lpX('d')\">⬇️ Descargar Excel</button><button class='btn alt' onclick=\"lpX('s')\">✉️ Enviar por correo</button></div><p class='msg' id='lpm'></p>";
-if(!S.loans.length)return h+"<p class='msg'>Aquí registras el dinero que le prestas a otras personas. Anotas a quién, cuánto, cuándo y de qué cuenta sale; después registras cada abono que te hagan y la app te dice cuánto te deben. Todo se puede bajar a Excel o enviar por correo.</p>";
-if(act.length)h+="<h2>Por cobrar</h2>"+act.map(lcard).join("");if(dn.length)h+="<h2>Pagados</h2>"+dn.map(lcard).join("");
-var M=lmov(L);h+="<h2>Movimientos ("+M.length+")</h2><div class='card'>"+M.slice(0,40).map(function(m){var pr=m.k==="l";return'<button class="row" onclick="'+(pr?"edLoan":"edLp")+"('"+m.id+"')\"><span class=\"av\" style=\"--c:"+(pr?"#e11d48":"#10b981")+'">'+(pr?"⬆️":"⬇️")+'</span><span class="grow"><b>'+(pr?"Préstamo a ":"Abono de ")+e(m.l.person)+"</b><small>"+fdt(m.d)+" · "+e(acct(pr?m.l.acct:m.c))+((pr?m.l.note:m.n)?" · "+e(pr?m.l.note:m.n):"")+'</small></span><b class="amt '+(pr?"neg":"pos")+'">'+(pr?"−":"+")+M$(m.a)+"</b></button>"}).join("")+"</div>"+(M.length>40?"<p class='msg'>Se muestran los 40 más recientes. El Excel trae todos.</p>":"");
-return h+"<p class='msg'>Los préstamos bajan el dinero de la cuenta de donde salen, pero no cuentan como gasto. Cada abono lo devuelve a la cuenta que elijas.</p>"}
-function edLoan(id){var l=S.loans.find(function(x){return x.id===id}),last=S.loans[S.loans.length-1];
-ed=l?{k:"loan",id:id,person:l.person,amt:dots(l.amt),acct:l.acct,date:l.date,due:l.due||"",note:l.note||""}:{k:"loan",person:lpf&&lpeople().filter(function(p){return p.toLowerCase()===lpf.toLowerCase()})[0]||"",amt:"",acct:last&&S.accts.some(function(a){return a.id===last.acct})?last.acct:dAc(),date:today(),due:"",note:""};go()}
-function fLoan(){var h="<h1>"+(ed.id?"Editar préstamo":"Nuevo préstamo")+"</h1><div class='card' style='padding:6px 14px 16px'><label>¿A quién le prestas?</label><input id='fn' list='lpl' maxlength='40' placeholder='Ej. Ana Gómez' value=\""+e(ed.person)+"\"><datalist id='lpl'>"+lpeople().map(function(p){return"<option value=\""+e(p)+"\">"}).join("")+"</datalist></div>"+amtBox("Monto prestado (COP)",ed.amt);
-h+="<label>Sale de la cuenta</label><select id='ff' onchange=\"pick('acct',this.value)\">"+ao(ed.acct)+"</select><p class='msg'>Saldo en "+e(acct(ed.acct))+": <b>"+M$(bal(ed.acct))+"</b></p>";
-h+="<label>Fecha del préstamo</label><input type='date' id='fd' value='"+ed.date+"'><label>¿Para cuándo te lo devolverá? (opcional)</label><input type='date' id='fv' value='"+ed.due+"'><label>Nota (opcional)</label><input id='fo' maxlength='80' value=\""+e(ed.note)+"\" placeholder='Ej. Para el arriendo'>";
-h+="<p class='msg'>El préstamo baja el dinero de la cuenta elegida, pero no cuenta como gasto. Cuando te paguen, registra un abono y el dinero vuelve a la cuenta que elijas.</p><p class='msg neg' id='ml'></p>";return h+bts("svLoan",ed.id?"rmLoan":"")}
-function svLoan(){keep();var amt=Number(digits(ed.amt)),n=ed.person.trim(),m=$("ml");if(!n){$("fn").focus();return}if(!amt){$("fa").focus();return}if(!ed.date){$("fd").focus();return}
-if(ed.due&&ed.due<ed.date){m.textContent="La fecha de devolución no puede ser anterior a la del préstamo.";return}
-var old=S.loans.find(function(x){return x.id===ed.id});if(old&&amt<lcalc(old).pd){m.textContent="Ya te han abonado "+M$(lcalc(old).pd)+", el monto no puede ser menor.";return}
-var o={id:ed.id||lid("l"),person:n,amt:amt,date:ed.date,due:ed.due||"",acct:ed.acct||"efectivo",note:(ed.note||"").trim()},i=S.loans.findIndex(function(x){return x.id===ed.id});if(i>=0)S.loans[i]=o;else S.loans.push(o);save();ed=null;tab="p";go()}
+h+="<button class='btn w' onclick='edLoan(\"\",\""+lpd+"\")'>"+(deb?"+ Registrar una deuda":"+ Nuevo préstamo")+"</button><div class='btns'><button class='btn alt' onclick=\"lpX('d')\">⬇️ Descargar Excel</button><button class='btn alt' onclick=\"lpX('s')\">✉️ Enviar por correo</button></div><p class='msg' id='lpm'></p>";
+if(!D.length)return h+"<p class='msg'>"+(deb?"Aquí registras el dinero que le debes a otras personas, con su interés, administración y pacto de pagos. Si pactaste fechas, la app te avisa en Gastos cuando toca pagar; si no, registras tus pagos desde aquí cuando los hagas.":"Aquí registras el dinero que le prestas a otras personas. Puedes pactar interés, cobro de administración y cuotas (iguales, personalizadas o libres). Después registras cada abono y la app te dice cuánto te deben.")+"</p>";
+if(act.length)h+="<h2>"+(deb?"Por pagar":"Por cobrar")+"</h2>"+act.map(lcard).join("");if(dn.length)h+="<h2>Pagados</h2>"+dn.map(lcard).join("");
+var M=lmov(L);h+="<h2>Movimientos ("+M.length+")</h2><div class='card'>"+M.slice(0,40).map(function(m){var pr=m.k==="l",sal=pr?!deb:deb;return'<button class="row" onclick="'+(pr?"edLoan":"edLp")+"('"+m.id+"')\"><span class=\"av\" style=\"--c:"+(sal?"#e11d48":"#10b981")+'">'+(sal?"⬆️":"⬇️")+'</span><span class="grow"><b>'+(pr?(deb?"Préstamo recibido de ":"Préstamo a "):(deb?"Pago a ":"Abono de "))+e(m.l.person)+"</b><small>"+fdt(m.d)+(((pr?m.l.acct:m.c))?" · "+e(acct(pr?m.l.acct:m.c)):"")+((pr?m.l.note:m.n)?" · "+e(pr?m.l.note:m.n):"")+'</small></span><b class="amt '+(sal?"neg":"pos")+'">'+(sal?"−":"+")+M$(m.a)+"</b></button>"}).join("")+"</div>"+(M.length>40?"<p class='msg'>Se muestran los 40 más recientes. El Excel trae todos.</p>":"");
+return h+"<p class='msg'>El interés y la administración se calculan por día sobre el capital que queda (mes de 30 días), sin cobrar interés sobre interés. Cada abono paga primero la administración, luego los intereses y al final el capital. Son valores estimados: lo que pacte el contrato manda. Los préstamos no cuentan como gasto ni como ingreso, solo mueven el saldo de la cuenta que elijas.</p>"}
+/* --- formulario de préstamo / deuda --- */
+function lsel(id,opts,cur,on){return"<select id='"+id+"'"+(on?" onchange=\""+on+"\"":"")+">"+opts.map(function(o){return"<option value='"+o[0]+"'"+(o[0]===cur?" selected":"")+">"+o[1]+"</option>"}).join("")+"</select>"}
+function edLoan(id,dir){var l=S.loans.find(function(x){return x.id===id}),last=S.loans.filter(function(x){return(x.dir||"p")===(dir||lpd)}).pop();
+if(l){var pl=l.plan||{};ed={k:"loan",id:id,dir:l.dir||"p",person:l.person,amt:dots(l.amt),acct:l.acct||"",date:l.date,due:l.due||"",note:l.note||"",ir:+l.ir>0?String(l.ir).replace(".",","):"",irt:l.irt||"m",fee:+l.fee>0?(l.ft==="p"?String(l.fee).replace(".",","):dots(l.fee)):"",ft:l.ft||"f",pm:l.pm||"l",pn:pl.n?String(pl.n):"6",pu:pl.u||"m",pnd:pl.nd?String(pl.nd):"30",pf:pl.f||addM(today(),1,dd(today()).getDate()),rows:l.pm==="c"?lsched(l).map(function(x){return{d:x.d,a:dots(x.a)}}):[]}}
+else ed={k:"loan",dir:dir||lpd,person:lpf&&lpeople(dir||lpd).filter(function(p){return p.toLowerCase()===lpf.toLowerCase()})[0]||"",amt:"",acct:last&&(!last.acct||S.accts.some(function(a){return a.id===last.acct}))?(last.acct||""):dAc(),date:today(),due:"",note:"",ir:"",irt:"m",fee:"",ft:"f",pm:"l",pn:"6",pu:"m",pnd:"30",pf:addM(today(),1,dd(today()).getDate()),rows:[]};go()}
+function lobj(){var pf=function(v){var n=parseFloat(String(v).replace(",","."));return isNaN(n)?0:n},o={id:ed.id||"tmp",dir:ed.dir||"p",person:ed.person,amt:Number(digits(ed.amt))||0,date:ed.date,acct:ed.acct||"",due:ed.pm==="l"?(ed.due||""):"",note:ed.note,ir:pf(ed.ir),irt:ed.irt,fee:ed.ft==="p"?pf(ed.fee):(Number(digits(ed.fee))||0),ft:ed.ft,pm:ed.pm,sch:[]};
+if(o.pm==="i"){o.plan={n:parseInt(ed.pn,10)||0,u:ed.pu,nd:parseInt(ed.pnd,10)||0,f:ed.pf};if(o.amt>0&&o.plan.n>0&&o.plan.f&&o.date&&o.plan.f>=o.date&&(o.plan.u!=="d"||o.plan.nd>0))o.sch=lgen(o)}
+else if(o.pm==="c")o.sch=(ed.rows||[]).map(function(r){return{d:r.d,a:Number(digits(r.a))||0}}).filter(function(r){return r.d&&r.a>0}).sort(function(a,b){return a.d<b.d?-1:a.d>b.d?1:0});
+return o}
+function lprev(){var p=$("lpv");if(!p||!ed||ed.k!=="loan")return;keep();var l=lobj(),sc=l.sch,tot=0;sc.forEach(function(x){tot+=x.a});
+if(!sc.length){p.textContent=ed.pm==="i"?"Completa el monto, la fecha y las cuotas para ver el valor de cada cuota.":"";return}
+p.innerHTML=ed.pm==="i"?"Cuotas de ≈ <b>"+M$(sc[0].a)+"</b> × "+sc.length+(sc[sc.length-1].a!==sc[0].a?" (la última ≈ "+M$(sc[sc.length-1].a)+")":"")+" · en total ≈ <b>"+M$(tot)+"</b>"+(tot>l.amt+1?" ("+M$(tot-l.amt)+" de intereses y administración)":""):"Total de las cuotas pactadas: <b>"+M$(tot)+"</b> en "+sc.length+(sc.length===1?" cuota":" cuotas")}
+function lwire(){["fa","fd","fir","firt","ffe","fft","fpn","fpu","fpnd","fpf"].forEach(function(i){var x=$(i);if(x)x.addEventListener("input",lprev)});lprev()}
+function lrow(i,add){keep();if(add>0)ed.rows.push({d:"",a:""});else ed.rows.splice(i,1);render()}
+function fLoan(){var deb=ed.dir==="d";if(ed.pm==="c"&&!(ed.rows||[]).length)ed.rows=[{d:"",a:""}];
+var h="<h1>"+(ed.id?(deb?"Editar deuda":"Editar préstamo"):(deb?"Nueva deuda":"Nuevo préstamo"))+"</h1><div class='card' style='padding:6px 14px 16px'><label>"+(deb?"¿A quién le debes?":"¿A quién le prestas?")+"</label><input id='fn' list='lpl' maxlength='40' placeholder='Ej. Ana Gómez' value=\""+e(ed.person)+"\"><datalist id='lpl'>"+lpeople(ed.dir).map(function(p){return"<option value=\""+e(p)+"\">"}).join("")+"</datalist></div>"+amtBox(deb?"Monto que te prestaron (COP)":"Monto prestado (COP)",ed.amt);
+h+="<label>"+(deb?"Entra a la cuenta":"Sale de la cuenta")+"</label><select id='ff' onchange=\"pick('acct',this.value)\"><option value=''"+(ed.acct?"":" selected")+">Ninguna (no mueve mis cuentas)</option>"+ao(ed.acct)+"</select>"+(ed.acct?"<p class='msg'>Saldo en "+e(acct(ed.acct))+": <b>"+M$(bal(ed.acct))+"</b></p>":"");
+h+="<label>Fecha del préstamo</label><input type='date' id='fd' value='"+ed.date+"'>";
+h+="<h2>Condiciones</h2><div class='card' style='padding:6px 14px 16px'><label>Interés (déjalo vacío si no hay)</label><div class='btns' style='margin-top:0'><input id='fir' inputmode='decimal' placeholder='Ej. 2' value='"+e(ed.ir)+"'>"+lsel("firt",[["m","% mensual"],["a","% anual (E.A.)"]],ed.irt)+"</div><label>Cobro por administración (opcional)</label><div class='btns' style='margin-top:0'><input id='ffe' inputmode='decimal' placeholder='Ej. 20000 o 1' value='"+e(ed.fee)+"'>"+lsel("fft",[["f","$ por mes"],["p","% mensual del saldo"]],ed.ft)+"</div></div>";
+h+="<h2>Pacto de pago</h2><div class='card' style='padding:6px 14px 16px'><label>¿Cómo se paga?</label>"+lsel("fpm",[["l","Libre: abonos cuando se pueda"],["i","Cuotas iguales con periodicidad"],["c","Cuotas personalizadas (fechas y valores)"]],ed.pm,"pick('pm',this.value)");
+if(ed.pm==="l")h+="<label>Fecha límite (opcional)</label><input type='date' id='fv' value='"+ed.due+"'>";
+if(ed.pm==="i")h+="<label>Número de cuotas</label><input id='fpn' inputmode='numeric' maxlength='3' value='"+e(ed.pn)+"'><label>Periodicidad</label>"+lsel("fpu",[["s","Semanal (cada 7 días)"],["q","Quincenal (cada 15 días)"],["m","Mensual"],["d","Cada cierto número de días"]],ed.pu,"pick('pu',this.value)")+(ed.pu==="d"?"<label>Cada cuántos días</label><input id='fpnd' inputmode='numeric' maxlength='3' value='"+e(ed.pnd)+"'>":"")+"<label>Fecha de la primera cuota</label><input type='date' id='fpf' value='"+ed.pf+"'><p class='msg' id='lpv'></p>";
+if(ed.pm==="c")h+="<label>Cuotas pactadas: fecha y valor (no tienen que ser iguales)</label>"+ed.rows.map(function(r,i){return"<div class='btns' style='margin-top:6px'><input type='date' id='frd"+i+"' value='"+e(r.d)+"'><input id='fra"+i+"' inputmode='numeric' placeholder='$ 0' value='"+e(r.a)+"' oninput='this.value=dots(this.value)'><button class='ib' onclick='lrow("+i+",0)' aria-label='Quitar cuota'>🗑</button></div>"}).join("")+"<button class='btn alt w' onclick='lrow(-1,1)'>+ Agregar cuota</button><p class='msg' id='lpv'></p>";
+h+="</div><label>Nota (opcional)</label><input id='fo' maxlength='80' value=\""+e(ed.note)+"\" placeholder='Ej. Para el arriendo'>";
+h+="<p class='msg'>El préstamo mueve el saldo de la cuenta elegida, pero no cuenta como gasto ni como ingreso. Cada abono o pago también mueve esa cuenta. Los valores de interés y cuotas son estimados.</p><p class='msg neg' id='ml'></p>";return h+bts("svLoan",ed.id?"rmLoan":"")}
+function svLoan(){keep();var m=$("ml"),n=ed.person.trim(),o=lobj(),amt=o.amt;if(!n){$("fn").focus();return}if(!amt){$("fa").focus();return}if(!ed.date){$("fd").focus();return}
+if(o.ir<0||o.fee<0){m.textContent="El interés y la administración no pueden ser negativos.";return}
+if(ed.pm==="l"&&ed.due&&ed.due<ed.date){m.textContent="La fecha límite no puede ser anterior a la del préstamo.";return}
+if(ed.pm==="i"){if(!(o.plan.n>=1)){$("fpn").focus();return}if(!o.plan.f){$("fpf").focus();return}if(o.plan.f<ed.date){m.textContent="La primera cuota no puede ser anterior a la fecha del préstamo.";return}if(ed.pu==="d"&&!(o.plan.nd>=1)){$("fpnd").focus();return}}
+if(ed.pm==="c"){if(!o.sch.length){m.textContent="Agrega al menos una cuota con fecha y valor.";return}if(o.sch.some(function(x){return x.d<ed.date})){m.textContent="Ninguna cuota puede ser anterior a la fecha del préstamo.";return}}
+var old=S.loans.find(function(x){return x.id===ed.id});if(old&&amt<lcalc(old).pc){m.textContent="Ya se han pagado "+M$(lcalc(old).pc)+" de capital, el monto no puede ser menor.";return}
+o.id=ed.id||lid("l");o.person=n;o.note=(ed.note||"").trim();if(ed.dir==="d")o.dir="d";else delete o.dir;if(!(o.ir>0)){delete o.ir;delete o.irt}if(!(o.fee>0)){delete o.fee;delete o.ft}if(o.pm==="l"){delete o.pm;delete o.sch}
+var i=S.loans.findIndex(function(x){return x.id===ed.id});if(i>=0)S.loans[i]=o;else S.loans.push(o);lpd=ed.dir==="d"?"d":"p";save();ed=null;tab="p";go()}
 function rmLoan(b){if(!sure(b))return;var id=ed.id;S.lp=S.lp.filter(function(p){return p.loan!==id});S.loans=S.loans.filter(function(l){return l.id!==id});save();ed=null;tab="p";go()}
+/* --- abonos y pagos --- */
 function edLp(id,loan){var p=S.lp.find(function(x){return x.id===id}),l=S.loans.find(function(x){return x.id===(p?p.loan:loan)});
-ed=p?{k:"lp",id:id,loan:p.loan,amt:dots(p.amt),date:p.date,acct:p.acct,note:p.note||""}:{k:"lp",loan:loan,amt:"",date:today(),acct:l&&S.accts.some(function(a){return a.id===l.acct})?l.acct:dAc(),note:""};go()}
-function lpOwn(){var own=0;if(ed.id){var p0=S.lp.find(function(x){return x.id===ed.id});if(p0&&p0.loan===ed.loan)own=p0.amt}return own}
-function fLp(){var ls=S.loans.filter(function(l){return l.id===ed.loan||!lcalc(l).done}),l=S.loans.find(function(x){return x.id===ed.loan})||ls[0];if(l)ed.loan=l.id;
-var h="<h1>"+(ed.id?"Editar abono":"Registrar abono")+"</h1>"+amtBox("Monto del abono (COP)",ed.amt)+"<label>¿Quién te paga?</label><select id='fg' onchange=\"pick('loan',this.value)\">"+ls.map(function(x){return"<option value='"+x.id+"'"+(l&&x.id===l.id?" selected":"")+">"+e(x.person)+" · "+fdt(x.date)+" · saldo "+M$(lcalc(x).sal)+"</option>"}).join("")+"</select><p class='msg'>Saldo pendiente: <b>"+M$(l?lcalc(l).sal+lpOwn():0)+"</b></p>";
-h+="<label>Entra a la cuenta</label><select id='ff'>"+ao(ed.acct)+"</select><label>Fecha</label><input type='date' id='fd' value='"+ed.date+"'><label>Nota (opcional)</label><input id='fo' maxlength='80' value=\""+e(ed.note)+"\" placeholder='Ej. Transferencia Nequi'>";
-return h+"<p class='msg'>El abono suma el dinero a la cuenta elegida y baja lo que te deben. No cuenta como ingreso.</p><p class='msg neg' id='ml'></p>"+bts("svLp",ed.id?"rmLp":"")}
+ed=p?{k:"lp",id:id,loan:p.loan,amt:dots(p.amt),date:p.date,acct:p.acct||"",note:p.note||""}:{k:"lp",loan:loan,amt:"",date:today(),acct:l&&(!l.acct||S.accts.some(function(a){return a.id===l.acct}))?(l.acct||dAc()):dAc(),note:""};go()}
+function fLp(){var ls=S.loans.filter(function(l){return l.id===ed.loan||!lcalc(l).done}),l=S.loans.find(function(x){return x.id===ed.loan})||ls[0];if(l)ed.loan=l.id;var deb=l&&l.dir==="d";
+var ow=l?lowedAt(l,ed.date||today(),ed.id):0,r=l?lsim(l,lpays(l,ed.id),ed.date||today()):null;
+var h="<h1>"+(ed.id?(deb?"Editar pago":"Editar abono"):(deb?"Registrar pago":"Registrar abono"))+"</h1>"+amtBox((deb?"Monto que pagas":"Monto del abono")+" (COP)",ed.amt)+"<label>"+(deb?"¿A quién le pagas?":"¿Quién te paga?")+"</label><select id='fg' onchange=\"pick('loan',this.value)\">"+ls.map(function(x){return"<option value='"+x.id+"'"+(l&&x.id===l.id?" selected":"")+">"+e(x.person)+(x.dir==="d"?" (debo)":"")+" · "+fdt(x.date)+"</option>"}).join("")+"</select>";
+h+="<label>Fecha</label><input type='date' id='fd' value='"+ed.date+"' onchange=\"pick('date',this.value)\"><p class='msg'>"+(r?"A esa fecha "+(deb?"debes":"te deben")+" en total <b>"+M$(ow)+"</b>: capital "+M$(r.K)+", intereses "+M$(r.I)+" y administración "+M$(r.F)+".":"")+"</p>";
+h+="<label>"+(deb?"Sale de la cuenta":"Entra a la cuenta")+"</label><select id='ff'><option value=''"+(ed.acct?"":" selected")+">Ninguna (no mueve mis cuentas)</option>"+ao(ed.acct)+"</select><label>Nota (opcional)</label><input id='fo' maxlength='80' value=\""+e(ed.note)+"\" placeholder='Ej. Transferencia Nequi'>";
+return h+"<p class='msg'>El abono paga primero la administración, luego los intereses y al final el capital. "+(deb?"Descuenta el dinero de la cuenta elegida.":"Suma el dinero a la cuenta elegida.")+" No cuenta como gasto ni como ingreso.</p><p class='msg neg' id='ml'></p>"+bts("svLp",ed.id?"rmLp":"")}
 function svLp(){keep();var amt=Number(digits(ed.amt)),l=S.loans.find(function(x){return x.id===ed.loan}),m=$("ml");if(!l)return;if(!amt){$("fa").focus();return}if(!ed.date){$("fd").focus();return}
-var sal=lcalc(l).sal+lpOwn();if(amt>sal){m.textContent="Ese préstamo solo tiene un saldo de "+M$(sal)+".";return}
-if(ed.date<l.date){m.textContent="El abono no puede ser anterior a la fecha del préstamo ("+fdt(l.date)+").";return}
-var o={id:ed.id||lid("q"),loan:l.id,amt:amt,date:ed.date,acct:ed.acct||"efectivo",note:(ed.note||"").trim()},i=S.lp.findIndex(function(x){return x.id===ed.id});if(i>=0)S.lp[i]=o;else S.lp.push(o);save();ed=null;tab="p";go()}
+if(ed.date<l.date){m.textContent="El pago no puede ser anterior a la fecha del préstamo ("+fdt(l.date)+").";return}
+var ow=lowedAt(l,ed.date,ed.id);if(amt>Math.ceil(ow)+1){m.textContent="A esa fecha el total pendiente es "+M$(ow)+" (capital, intereses y administración). No puedes pagar más.";return}
+var o={id:ed.id||lid("q"),loan:l.id,amt:amt,date:ed.date,acct:ed.acct||"",note:(ed.note||"").trim()},i=S.lp.findIndex(function(x){return x.id===ed.id});if(i>=0)S.lp[i]=o;else S.lp.push(o);if(ed.pk)S.cl[ed.pk]="ok";lpd=l.dir==="d"?"d":"p";save();ed=null;tab="p";go()}
 function rmLp(b){if(!sure(b))return;S.lp=S.lp.filter(function(p){return p.id!==ed.id});save();ed=null;tab="p";go()}
 
 /* ---------- Excel de préstamos y respaldo en Excel ---------- */
 var ASC=function(a,b){return a.date<b.date?-1:a.date>b.date?1:0};
-function lsheets(){var L=S.loans.slice().sort(function(a,b){return a.date<b.date?-1:a.date>b.date?1:(a.id<b.id?-1:1)}),num={},M=[],hd=function(a){return a.map(function(h){return cS(h,1)})};
-L.forEach(function(l,i){num[l.id]=i+1;M.push({d:l.date,t:"Préstamo",p:l.person.trim(),a:l.amt,c:acct(l.acct),n:l.note,r:i+1})});
-S.lp.forEach(function(p){var l=S.loans.find(function(x){return x.id===p.loan});if(l)M.push({d:p.date,t:"Abono",p:l.person.trim(),a:p.amt,c:acct(p.acct),n:p.note,r:num[l.id]})});
+function lsheets(){var L=S.loans.slice().sort(function(a,b){return a.date<b.date?-1:a.date>b.date?1:(a.id<b.id?-1:1)}),num={},M=[],hd=function(a){return a.map(function(h){return cS(h,1)})},sen=function(l){return l.dir==="d"?"Debo":"Presté"};
+L.forEach(function(l,i){num[l.id]=i+1;M.push({d:l.date,t:"Préstamo",p:l.person.trim(),a:l.amt,c:l.acct?acct(l.acct):"",n:l.note,r:i+1,s:sen(l)})});
+S.lp.forEach(function(p){var l=S.loans.find(function(x){return x.id===p.loan});if(l)M.push({d:p.date,t:"Abono",p:l.person.trim(),a:p.amt,c:p.acct?acct(p.acct):"",n:p.note,r:num[l.id],s:sen(l)})});
 M.sort(function(a,b){return a.d<b.d?-1:a.d>b.d?1:((a.t==="Préstamo"?0:1)-(b.t==="Préstamo"?0:1))});
-var mn=Math.max(M.length,1)+1,rg=function(c){return"Movimientos!$"+c+"$2:$"+c+"$"+mn},mr=[hd(["Fecha","Tipo","Persona","Monto","Cuenta","Nota","N° préstamo"])];
-M.forEach(function(m){mr.push([cN(dser(m.d),2),cS(m.t),cS(m.p),cN(m.a,3),cS(m.c),cS(m.n),cN(m.r)])});
-var lr=[hd(["N°","Persona","Fecha del préstamo","Monto prestado","Fecha pactada de pago","Abonado","Saldo","Estado","Cuenta de salida","Nota"])],tp=0,ta=0;
-L.forEach(function(l,i){var r=i+2,c=lcalc(l);tp+=l.amt;ta+=c.pd;
-lr.push([cN(i+1),cS(l.person.trim()),cN(dser(l.date),2),cN(l.amt,3),l.due?cN(dser(l.due),2):null,cF("SUMIFS("+rg("D")+","+rg("B")+',"Abono",'+rg("G")+",A"+r+")",c.pd,3),cF("D"+r+"-F"+r,c.sal,3),cF('IF(G'+r+'<=0,"Pagado",IF(AND(E'+r+'<>"",E'+r+'<TODAY()),"Vencido","Pendiente"))',c.done?"Pagado":c.late?"Vencido":"Pendiente"),cS(acct(l.acct)),cS(l.note)])});
-if(L.length){var e1=L.length+1;lr.push([null,cS("Total",4),null,cF("SUM(D2:D"+e1+")",tp,5),null,cF("SUM(F2:F"+e1+")",ta,5),cF("SUM(G2:G"+e1+")",tp-ta,5)])}
-var pk={},P=[],pr=[hd(["Persona","Prestado","Abonado","Saldo"])];L.forEach(function(l){var q=l.person.trim().toLowerCase();if(!pk[q]){pk[q]=1;P.push(l.person.trim())}});
-P.forEach(function(p,i){var r=i+2,q=p.toLowerCase(),a=0,b=0;L.forEach(function(l){if(l.person.trim().toLowerCase()===q){a+=l.amt;b+=lcalc(l).pd}});
-pr.push([cS(p),cF("SUMIFS("+rg("D")+","+rg("B")+',"Préstamo",'+rg("C")+",A"+r+")",a,3),cF("SUMIFS("+rg("D")+","+rg("B")+',"Abono",'+rg("C")+",A"+r+")",b,3),cF("B"+r+"-C"+r,a-b,3)])});
-return[{n:"Préstamos",rows:lr,w:[6,26,18,18,22,16,16,14,22,36]},{n:"Movimientos",rows:mr,w:[14,12,26,16,22,36,12]},{n:"Por persona",rows:pr,w:[28,18,18,18]}]}
+var mn=Math.max(M.length,1)+1,rg=function(c){return"Movimientos!$"+c+"$2:$"+c+"$"+mn},mr=[hd(["Fecha","Tipo","Persona","Monto","Cuenta","Nota","N° préstamo","Sentido"])];
+M.forEach(function(m){mr.push([cN(dser(m.d),2),cS(m.t),cS(m.p),cN(m.a,3),cS(m.c),cS(m.n),cN(m.r),cS(m.s)])});
+var lr=[hd(["N°","Sentido","Persona","Fecha","Capital inicial","Condiciones pactadas","Fecha límite o última cuota","Abonado o pagado","Capital pendiente (hoy)","Intereses y adm. pendientes (hoy)","Total hoy","Estado","Cuenta","Nota"])],cr=[hd(["N° préstamo","Persona","Fecha pactada","Valor de la cuota","Estado"])],tm=0,td=0;
+L.forEach(function(l,i){var r=i+2,c=lcalc(l),sc=lsched(l),last=sc.length?sc[sc.length-1].d:(l.due||"");if(l.dir==="d")td+=c.sal;else tm+=c.sal;
+lr.push([cN(i+1),cS(sen(l)),cS(l.person.trim()),cN(dser(l.date),2),cN(l.amt,3),cS(lcond(l)),last?cN(dser(last),2):null,cF("SUMIFS("+rg("D")+","+rg("B")+',"Abono",'+rg("G")+",A"+r+")",c.pd,3),cN(Math.max(0,c.cap),3),cN(c.int+c.fee,3),cN(c.sal,3),cS(c.done?"Pagado":c.late?"Vencido":"Pendiente"),cS(l.acct?acct(l.acct):""),cS(l.note)]);
+var cum=0;sc.forEach(function(x){cum+=x.a;cr.push([cN(i+1),cS(l.person.trim()),cN(dser(x.d),2),cN(x.a,3),cS(cum-c.pd<=0.5?"Cubierta":x.d<today()?"Vencida":"Pendiente")])})});
+if(L.length){var e1=L.length+1;lr.push([]);lr.push([null,cS("Me deben (total hoy)",4),null,null,null,null,null,null,null,null,cF("SUMIF(B2:B"+e1+',"Presté",K2:K'+e1+")",tm,5)]);lr.push([null,cS("Yo debo (total hoy)",4),null,null,null,null,null,null,null,null,cF("SUMIF(B2:B"+e1+',"Debo",K2:K'+e1+")",td,5)])}
+var pk={},P=[],pr=[hd(["Persona","Sentido","Capital","Abonado o pagado","Total hoy"])];
+L.forEach(function(l){var q=sen(l)+"|"+l.person.trim().toLowerCase();if(!pk[q]){pk[q]=1;P.push({p:l.person.trim(),s:sen(l)})}});
+P.forEach(function(x,i){var r=i+2,a=0,b=0,t=0;L.forEach(function(l){if(sen(l)===x.s&&l.person.trim().toLowerCase()===x.p.toLowerCase()){var c=lcalc(l);a+=l.amt;b+=c.pd;t+=c.sal}});
+pr.push([cS(x.p),cS(x.s),cF("SUMIFS("+rg("D")+","+rg("B")+',"Préstamo",'+rg("C")+",A"+r+","+rg("H")+",B"+r+")",a,3),cF("SUMIFS("+rg("D")+","+rg("B")+',"Abono",'+rg("C")+",A"+r+","+rg("H")+",B"+r+")",b,3),cN(t,3)])});
+return[{n:"Préstamos y deudas",rows:lr,w:[6,10,24,14,16,46,18,16,16,18,16,12,20,30]},{n:"Plan de cuotas",rows:cr,w:[12,26,16,18,14]},{n:"Movimientos",rows:mr,w:[14,12,26,16,22,36,12,10]},{n:"Por persona",rows:pr,w:[28,10,18,18,18]}]}
 function fullSheets(){var sh=[],cn=function(id){return cat(id).name};
 sh.push(tbl("Gastos",[["Fecha","d"],["Monto","m"],["Categoría","t"],["Medio de pago","t"],["Cuenta o tarjeta","t"],["Cuotas","n"],["Nota","t"]],S.tx.slice().sort(ASC).map(function(t){return[t.date,t.amt,cn(t.cat),t.pay==="efectivo"?"Efectivo":t.pay==="cuenta"?"Cuenta":"Tarjeta",t.pay==="cuenta"?acct(t.acct):t.pay==="tarjeta"?cardName(t.card):"",t.cuotas||1,t.note||""]}),[14,16,20,16,24,10,36]));
 sh.push(tbl("Cuentas",[["Cuenta","t"],["Saldo actual","m"]],S.accts.map(function(a){return[a.name,bal(a.id)]}),[30,18]));
